@@ -2,45 +2,35 @@
 """
 
 """ Перед началом работ необходимо выполнить команду pip3 install -r requirements.txt при наличии файла requirements.txt """
-import os
 import inspect
-try:
-    from fabric.api import cd, run, put
-except ImportError:
-    raise ImportError('для установки этой библиотеки введите команду pip install fabric3 в терминале')
-
-try:
-    from fabric.contrib.files import exists
-except ImportError:
-    raise ImportError('для установки этой библиотеки введите команду pip install Fabric в терминале')
+import os
+from subprocess import call
 
 
+def _read_requirements(relpath):
+    fullpath = os.path.join(os.path.dirname(__file__), relpath)
+    with open(fullpath) as file:
+        return [s.strip() for s in file.readlines()
+                if (s.strip() and not s.startswith("#"))]
 
 
-APP_NAME = 'ParserYandexSimplified'
-APP_ROOT = str(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))))
-APP_DST = os.path.join(APP_ROOT, APP_NAME)
+_REQUIREMENTS_TXT = _read_requirements("requirements.txt")
+INSTALL_REQUIRES = [line for line in _REQUIREMENTS_TXT if "://" not in line]
 
 
-
-def prepare_venv(app_src):
-    requirements_txt = os.path.join(app_src, "requirements.txt")
+def prepare_venv():
     app_venv_name = "venv"
 
-    # run("mkdir -p {}".format(APP_DST))
-    with cd(APP_DST):
-        if not exists(app_venv_name):
-            run("virtualenv {}".format(app_venv_name))
-        # upgrade pip
-        run("venv/bin/pip install --upgrade pip")
-        # update requirements.txt and upgrade venv
-        run("cp {} .".format(requirements_txt))
-        # run("venv/bin/pip install --upgrade -r requirements.txt")
-        run("venv/bin/pip install --upgrade tornado")
+    if not os.path.exists(app_venv_name):
+        os.mkdir(f" {app_venv_name}")
+    # upgrade pip
+    call(['pip', 'install', '--upgrade'])
 
-prepare_venv(APP_ROOT)
+    # update requirements.txt and upgrade venv
+    call(['pip', 'install', '--upgrade'] + INSTALL_REQUIRES)
 
 
+prepare_venv()
 
 import traceback
 from datetime import datetime, time
@@ -73,8 +63,6 @@ except ImportError:
 
 from tqdm import tqdm
 
-
-# def test_requirements(self):
 try:
     with open(f'{"requirements.txt"}', 'r') as f:
         requirements = f.read()
@@ -186,7 +174,6 @@ soup_name = 'li'
 soup_class = 'serp-item'
 soup_attribute = 'text'
 
-
 print(f'Invoking __init__.py for {__name__}')
 
 VIS_LOG = True  # True -  Отображение хода процесса в консоли
@@ -292,7 +279,7 @@ def l_message(names=None, value=None, color=None, r_log=None, r_print=None) -> N
         print(decorate_msg("lm " + name + f" TypeError: {repr(err)}", BColors.FAIL))
 
 
-def gfn():
+def calling_script() -> object:
     """ Получение имени вызывающей функции.
     :rtype: object
     """
@@ -315,11 +302,11 @@ class WriterToXLSX:
         """Записываем данные в файл Excel."""
 
         if len(self.divs_requests) == 0:
-            l_message(gfn(), '\n Нет данных для записи в файл! \n', color=BColors.FAIL)
+            l_message(calling_script(), '\n Нет данных для записи в файл! \n', color=BColors.FAIL)
             return
 
         self.insert_headers_divs_requests()
-        excel_app, wbook = self.create_workbook()
+        excel_app, wbook = self.create_workbook
 
         if __debug__ and not PASSED:
             assert excel_app is not None, 'Не удалось подключится к excel'
@@ -331,15 +318,15 @@ class WriterToXLSX:
             self.excel_app_quit()
 
         except Exception as err:
-            l_message(gfn(), f" Exception: {repr(err)}", color=BColors.FAIL)
-            l_message(gfn(), 'Не удалось записать данные', color=BColors.FAIL)
+            l_message(calling_script(), f" Exception: {repr(err)}", color=BColors.FAIL)
+            l_message(calling_script(), 'Не удалось записать данные', color=BColors.FAIL)
             self.excel_app_quit()
             return
 
     def _write_to_sheet(self):
         """Запись данных на лист."""
 
-        l_message(gfn(), 'Начало записи данных в файл', color=BColors.OKBLUE)
+        l_message(calling_script(), 'Начало записи данных в файл', color=BColors.OKBLUE)
         doc_row: int = 1
         for divs_iter in self.divs_requests:  # записываем данные
 
@@ -355,13 +342,14 @@ class WriterToXLSX:
             self.wbook.Worksheets.Item(1).Cells(doc_row, 7).Value = divs_iter['company_text']
             self.wbook.Worksheets.Item(1).Cells(doc_row, 8).Value = divs_iter['company_contact']
             doc_row += 1
-        l_message(gfn(), 'Данные записаны', color=BColors.OKBLUE)
+        l_message(calling_script(), 'Данные записаны', color=BColors.OKBLUE)
 
     def insert_headers_divs_requests(self):
         """Создание заголовков в list с распарсенными данными."""
 
         return self.divs_requests.insert(0, headers_tab)
 
+    @property
     def create_workbook(self):
         """ Создание обектов приложения Excel и обьекта страницы."""
 
@@ -375,22 +363,22 @@ class WriterToXLSX:
 
             self.wbook = self.excel_app.Workbooks.Add()
             self.wbook.SaveAs(self.full_path_to_file)
-            l_message(gfn(), f'Книга создана в {self.full_path_to_file}', color=BColors.OKBLUE)
+            l_message(calling_script(), f'Книга создана в {self.full_path_to_file}', color=BColors.OKBLUE)
 
             self.wbook = self.excel_app.Workbooks.Open(self.full_path_to_file)
 
         except com_error as err:
-            l_message(gfn(), f" pywintypes.com_error: {repr(err)}", color=BColors.FAIL)
+            l_message(calling_script(), f" pywintypes.com_error: {repr(err)}", color=BColors.FAIL)
 
         except TypeError as err:
-            l_message(gfn(), f"  TypeError: {repr(err)}", color=BColors.FAIL)
+            l_message(calling_script(), f"  TypeError: {repr(err)}", color=BColors.FAIL)
             try:
                 self.wbook.Close(False)  # save the workbook
                 self.excel_app_quit()
-                l_message(gfn(), "**** Аварийное завершение программы ****", color=BColors.FAIL)
+                l_message(calling_script(), "**** Аварийное завершение программы ****", color=BColors.FAIL)
 
             except AttributeError as err:
-                l_message(gfn(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
+                l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
                 quit()
 
         return self.excel_app, self.wbook
@@ -417,10 +405,10 @@ def get_my_company_title(div):
     try:
         my_company_title: str = div.find('h2', attrs={
             'class': "organic__title-wrapper typo typo_text_l typo_line_m"}).text.strip()
-        l_message(gfn(), f'company_title {my_company_title}', color=BColors.OKBLUE)
+        l_message(calling_script(), f'company_title {my_company_title}', color=BColors.OKBLUE)
 
     except AttributeError as err:
-        l_message(gfn(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
+        l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
         my_company_title: str = 'N/A'
 
     return my_company_title
@@ -431,10 +419,10 @@ def get_my_company_cid(div):
     """
     try:
         my_company_cid: str = str(div.get('data-cid'))
-        l_message(gfn(), f'company_cid {my_company_cid}', color=BColors.OKBLUE)
+        l_message(calling_script(), f'company_cid {my_company_cid}', color=BColors.OKBLUE)
 
     except AttributeError as err:
-        l_message(gfn(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
+        l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
         my_company_cid: str = ''
 
     return my_company_cid
@@ -451,10 +439,10 @@ def get_my_company_contact(div):
         if text > 0:
             my_company_contact = my_company_contact[text:]
 
-        l_message(gfn(), f'company_contact {my_company_contact}', color=BColors.OKBLUE)
+        l_message(calling_script(), f'company_contact {my_company_contact}', color=BColors.OKBLUE)
 
     except AttributeError as err:
-        l_message(gfn(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
+        l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
         my_company_contact: str = 'N/A'
 
     return my_company_contact
@@ -466,10 +454,10 @@ def get_my_company_text(div):
     try:
         my_company_text: str = div.find('div', attrs={
             'class': 'text-container typo typo_text_m typo_line_m organic__text'}).text.strip()
-        l_message(gfn(), f'company_text  {my_company_text}', color=BColors.OKBLUE)
+        l_message(calling_script(), f'company_text  {my_company_text}', color=BColors.OKBLUE)
 
     except AttributeError as err:
-        l_message(gfn(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
+        l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
         my_company_text: str = ''
 
     return my_company_text
@@ -481,10 +469,10 @@ def get_my_company_sitelinks(div):
     try:
         my_company_sitelinks: str = div.find('div', attrs={
             'class': 'sitelinks sitelinks_size_m organic__sitelinks'}).text.strip()
-        l_message(gfn(), f'company_site_links  {my_company_sitelinks}', color=BColors.OKBLUE)
+        l_message(calling_script(), f'company_site_links  {my_company_sitelinks}', color=BColors.OKBLUE)
 
     except AttributeError as err:
-        l_message(gfn(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
+        l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
         my_company_sitelinks: str = 'N/A'
 
     return my_company_sitelinks
@@ -499,10 +487,10 @@ def get_my_company_link_1(div):
         text: int = my_company_link_1.rfind('›')
         if text > 0:
             my_company_link_1 = my_company_link_1[0:text]
-        l_message(gfn(), f'company_link_1 {my_company_link_1}', color=BColors.OKBLUE)
+        l_message(calling_script(), f'company_link_1 {my_company_link_1}', color=BColors.OKBLUE)
 
     except AttributeError as err:
-        l_message(gfn(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
+        l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
         my_company_link_1: str = ''
 
     return my_company_link_1
@@ -539,10 +527,10 @@ class Parser:
     def start_work(self):
         """ Определение начало работы в базовом классе.
         """
-        assert self.urls is not None, f"{gfn()} urls not passed"
+        assert self.urls is not None, f"{calling_script()} urls not passed"
 
         for number, item_url in enumerate(self.urls):
-            l_message(gfn(), f"\nЗапрос номер: {number + 1} \n", color=BColors.OKBLUE)
+            l_message(calling_script(), f"\nЗапрос номер: {number + 1} \n", color=BColors.OKBLUE)
 
             try:
                 self.url = item_url['url']
@@ -562,7 +550,7 @@ class Parser:
                 self._time_rand(2, 4)
 
             except ConnectionError as err:
-                l_message(gfn(), f" ConnectionError: {repr(err)}", color=BColors.FAIL)
+                l_message(calling_script(), f" ConnectionError: {repr(err)}", color=BColors.FAIL)
                 continue
 
         self.write_data_to_file()
@@ -570,12 +558,12 @@ class Parser:
     def write_data_to_file(self):
         """ Запись в файл excel.
         """
-        raise NotImplementedError(f'Определите {gfn()} в {self.__class__.__name__}')
+        raise NotImplementedError(f'Определите {calling_script()} в {self.__class__.__name__}')
 
     def divs_text_shelves(self):
         """ Поиск данных в ответе сервера.
         """
-        raise NotImplementedError(f'Определите {gfn()} в {self.__class__.__name__}')
+        raise NotImplementedError(f'Определите {calling_script()} в {self.__class__.__name__}')
 
     def get_session(self):
         """ Создание сессии.
@@ -600,15 +588,16 @@ class Parser:
                 self.request: Response = self.session.get(self.url, headers=header, stream=True,
                                                           timeout=self.request_timeout)
                 if self.check_request_status_code(self.request):
-                    l_message(gfn(), 'Успешный запрос!', color=BColors.OKBLUE)
+                    l_message(calling_script(), 'Успешный запрос!', color=BColors.OKBLUE)
                     self.close_session()
                     return self.request
                 else:
-                    l_message(gfn(), 'Ошибка при установке соединения! проверьте HEADERS!', color=BColors.FAIL)
+                    l_message(calling_script(), 'Ошибка при установке соединения! проверьте HEADERS!',
+                              color=BColors.FAIL)
                     continue
 
             except Exception as err:
-                l_message(gfn(), f"Exception: {repr(err)}", color=BColors.FAIL)
+                l_message(calling_script(), f"Exception: {repr(err)}", color=BColors.FAIL)
 
     def get_response_with_proxy(self):
         """ Функция посылает запрос и получает ответ. Если ответ есть - передаёт на обработку.
@@ -626,7 +615,7 @@ class Parser:
                 return
 
             for item_data in list(item_request):
-                l_message(gfn(), f"proxy {item_data['proxy']}", color=BColors.OKGREEN)
+                l_message(calling_script(), f"proxy {item_data['proxy']}", color=BColors.OKGREEN)
                 try:
                     time_start = time.monotonic()
                     session = self.get_session()
@@ -635,24 +624,24 @@ class Parser:
                                                          stream=item_data['stream'],
                                                          timeout=item_data['TIMEOUT'],
                                                          proxies=item_data['proxy'])
-                    self._measure_time_request(str(gfn()), time_start)
+                    self._measure_time_request(str(calling_script()), time_start)
 
                     if self.check_request_status_code(self.request):
                         return self.request
                     else:
-                        l_message(gfn(), 'Ошибка при установке соединения! проверьте HEADERS!',
+                        l_message(calling_script(), 'Ошибка при установке соединения! проверьте HEADERS!',
                                   color=BColors.FAIL)
                         continue
 
                 except ConnectTimeout as err:
-                    l_message(gfn(), f"ConnectTimeout: {repr(err)}", color=BColors.FAIL)
-                    l_message(gfn(), "Connection to proxy timed out", color=BColors.FAIL)
-                    self._measure_time_request(str(gfn()), time_start)
+                    l_message(calling_script(), f"ConnectTimeout: {repr(err)}", color=BColors.FAIL)
+                    l_message(calling_script(), "Connection to proxy timed out", color=BColors.FAIL)
+                    self._measure_time_request(str(calling_script()), time_start)
                     continue
 
                 except ProxyError as err:
-                    l_message(gfn(), f"ProxyError: {repr(err)}", color=BColors.FAIL)
-                    l_message(gfn(), f"Удалите прокси из списка: {repr(err)}", color=BColors.FAIL)
+                    l_message(calling_script(), f"ProxyError: {repr(err)}", color=BColors.FAIL)
+                    l_message(calling_script(), f"Удалите прокси из списка: {repr(err)}", color=BColors.FAIL)
 
     @staticmethod
     def _measure_time_request(function: str, t_start):
@@ -682,27 +671,28 @@ class Parser:
         """ Проверка кода ответа запроса.
         """
         if request.status_code == 200:  # если запрос был выполнен успешно то
-            l_message(gfn(), 'Успешный запрос!', color=BColors.OKBLUE)
+            l_message(calling_script(), 'Успешный запрос!', color=BColors.OKBLUE)
             return True
 
         elif request.status_code == 400:
-            l_message(gfn(), f'BAD request {self.url} : {str(request.status_code)}', color=BColors.FAIL)
+            l_message(calling_script(), f'BAD request {self.url} : {str(request.status_code)}', color=BColors.FAIL)
             return False
 
         elif request.status_code == 406:
-            l_message(gfn(), f'Client Error {self.url} : {str(request.status_code)}', color=BColors.FAIL)
+            l_message(calling_script(), f'Client Error {self.url} : {str(request.status_code)}', color=BColors.FAIL)
             return False
 
         elif 406 < request.status_code < 500:
-            l_message(gfn(), f'Client Error {self.url} : {str(request.status_code)}', color=BColors.FAIL)
+            l_message(calling_script(), f'Client Error {self.url} : {str(request.status_code)}', color=BColors.FAIL)
             return False
 
         elif 500 <= request.status_code < 600:
-            l_message(gfn(), f'Server Error {self.url} : {str(request.status_code)}', color=BColors.FAIL)
+            l_message(calling_script(), f'Server Error {self.url} : {str(request.status_code)}', color=BColors.FAIL)
             return False
 
         else:
-            l_message(gfn(), f'Неудачный запрос! Ответ {str(request.status_code)} : {str(request.status_code)}',
+            l_message(calling_script(),
+                      f'Неудачный запрос! Ответ {str(request.status_code)} : {str(request.status_code)}',
                       color=BColors.FAIL)
             return False
 
@@ -711,28 +701,29 @@ class Parser:
             divs_text_shelves.
         """
         if not hasattr(self.request, self.soup_attribute):
-            l_message(gfn(), 'Ответ не содержит текст :(', color=BColors.FAIL)
+            l_message(calling_script(), 'Ответ не содержит текст :(', color=BColors.FAIL)
             return
 
         if self.request.text == '':
-            l_message(gfn(), 'Ответ не содержит текстовых данных :(', color=BColors.FAIL)
+            l_message(calling_script(), 'Ответ не содержит текстовых данных :(', color=BColors.FAIL)
             return
 
         soup = BeautifulSoup(self.request.text, 'lxml')  # ответ
         self.divs = soup.find_all(class_=self.soup_class)  # данные ответа
 
         if self.divs is None or len(self.divs) == 0:
-            l_message(gfn(), 'Ответ не содержит нужных данных :(', color=BColors.FAIL)
+            l_message(calling_script(), 'Ответ не содержит нужных данных :(', color=BColors.FAIL)
             return
 
-        l_message(gfn(), f'Всего найдено блоков {str(len(self.divs))}', color=BColors.OKBLUE)
+        l_message(calling_script(), f'Всего найдено блоков {str(len(self.divs))}', color=BColors.OKBLUE)
 
     @staticmethod
     def _time_rand(t_start: int = 1, t_stop: int = 30):
         """ Функция задержки выполнения кода на рандомный промежутокю
         """
         time_random = randint(t_start, t_stop)
-        l_message(gfn(), f'Время ожидания нового запроса time_rand  {str(time_random)} sec', color=BColors.OKBLUE)
+        l_message(calling_script(), f'Время ожидания нового запроса time_rand  {str(time_random)} sec',
+                  color=BColors.OKBLUE)
 
         for _ in range(time_random):
             sleep(uniform(0.8, 1.2))
@@ -742,14 +733,14 @@ class Parser:
         """ Создание папки по пути.
         """
         os.makedirs(path)
-        l_message(gfn(), f'Файл создан в {path}', color=BColors.OKBLUE)
+        l_message(calling_script(), f'Файл создан в {path}', color=BColors.OKBLUE)
 
     @staticmethod
     def check_folder(*, path: str) -> bool:
         """ Проверка файл или каталог.
         """
         if not os.path.exists(path):
-            l_message(gfn(), 'Файл не найден', color=BColors.OKBLUE)
+            l_message(calling_script(), 'Файл не найден', color=BColors.OKBLUE)
             return False
         return True
 
@@ -769,7 +760,8 @@ class Parser:
     def check_ip():
         """Check my public IP via tor.
         """
-        l_message(gfn(), f'My public IP {requests.get("http://www.icanha4zip.com").text[:-2]}', color=BColors.OKBLUE)
+        l_message(calling_script(), f'My public IP {requests.get("http://www.icanha4zip.com").text[:-2]}',
+                  color=BColors.OKBLUE)
 
     def get_proxy_pool_from_file(self):
         """Создаём пул прокси.
@@ -810,10 +802,10 @@ class ParserYandex(Parser):
     def start_work(self):
         """ функция парсера.
         """
-        assert self.urls is not None, str(gfn()) + 'urls not passed'
+        assert self.urls is not None, str(calling_script()) + 'urls not passed'
 
         for number, item_url in enumerate(self.urls):
-            l_message(gfn(), f"\nЗапрос номер: {number + 1} \n", color=BColors.OKBLUE)
+            l_message(calling_script(), f"\nЗапрос номер: {number + 1} \n", color=BColors.OKBLUE)
 
             try:
                 self.url = item_url['url']
@@ -833,7 +825,7 @@ class ParserYandex(Parser):
                 self._time_rand(2, 4)
 
             except ConnectionError as err:
-                l_message(gfn(), f" ConnectionError: {repr(err)}", color=BColors.FAIL)
+                l_message(calling_script(), f" ConnectionError: {repr(err)}", color=BColors.FAIL)
                 continue
 
         self.write_data_to_file()
@@ -886,12 +878,12 @@ def url_constructor_yandex(queries_path, selected_base_url, selected_region, wit
 
         for i in range(max_pos):  # дополняем url и формируем для кажного запроса
             if i == 0:
-                l_message(gfn(), mod_url, color=BColors.OKBLUE)
+                l_message(calling_script(), mod_url, color=BColors.OKBLUE)
                 urls.append({'url': mod_url, 'ques': divs_ques})  # перывя ссылка с ключем
             else:
                 url = str(mod_url + '&p=' + str(i))
                 if url not in urls:
-                    l_message(gfn(), url, color=BColors.OKBLUE)
+                    l_message(calling_script(), url, color=BColors.OKBLUE)
                     urls.append({'url': url, 'ques': divs_ques})  # остальные ссылки с ключом
     return urls
 
@@ -899,7 +891,7 @@ def url_constructor_yandex(queries_path, selected_base_url, selected_region, wit
 def main():
     """Основная функция с параметрами.
     """
-    l_message(gfn(), '\n**** Start ****\n', color=BColors.OKBLUE)
+    l_message(calling_script(), '\n**** Start ****\n', color=BColors.OKBLUE)
 
     urls = url_constructor_yandex(queries_path, base_url_yandex, region_yandex, within_time, num_doc,
                                   url_max_pos_yandex)
@@ -907,7 +899,7 @@ def main():
     parser = ParserYandex(urls=urls)
     parser.start_work()
 
-    l_message(gfn(), '\n**** Done ****\n', color=BColors.OKBLUE)
+    l_message(calling_script(), '\n**** Done ****\n', color=BColors.OKBLUE)
 
 
 if __name__ == '__main__':
