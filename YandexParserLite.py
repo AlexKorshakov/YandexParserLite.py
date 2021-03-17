@@ -254,6 +254,7 @@ def log_vis_rec(*, param_name: str = None, p_value=None, d_path=None, r_log: boo
 
 def l_message(names=None, value=None, color=None, r_log=None, r_print=None) -> None:
     """ Функция логирования в файл и отображения данны в терминале.
+    :rtype: None
     """
 
     if isinstance(r_log, type(None)):
@@ -675,11 +676,7 @@ class Parser:
             l_message(calling_script(), f'BAD request {self.url} : {str(request.status_code)}', color=BColors.FAIL)
             return False
 
-        elif request.status_code == 406:
-            l_message(calling_script(), f'Client Error {self.url} : {str(request.status_code)}', color=BColors.FAIL)
-            return False
-
-        elif 406 < request.status_code < 500:
+        elif 401 < request.status_code < 500:
             l_message(calling_script(), f'Client Error {self.url} : {str(request.status_code)}', color=BColors.FAIL)
             return False
 
