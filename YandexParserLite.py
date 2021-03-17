@@ -20,12 +20,10 @@ INSTALL_REQUIRES = [line for line in _REQUIREMENTS_TXT if "://" not in line]
 
 def prepare_venv():
     app_venv_name = "venv"
-
     if not os.path.exists(app_venv_name):
         os.mkdir(f" {app_venv_name}")
     # upgrade pip
     call(['pip', 'install', '--upgrade'])
-
     # update requirements.txt and upgrade venv
     call(['pip', 'install', '--upgrade'] + INSTALL_REQUIRES)
 
@@ -33,9 +31,9 @@ def prepare_venv():
 prepare_venv()
 
 import traceback
-from datetime import datetime, time
+from datetime import datetime
 from random import choice, randint, uniform
-from time import sleep
+from time import sleep, monotonic
 
 try:
     import win32com.client as win32
@@ -354,7 +352,6 @@ class WriterToXLSX:
         """ Создание обектов приложения Excel и обьекта страницы."""
 
         try:
-            # self.excel_app = win32com.client.gencache.EnsureDispatch('Excel.Application')
             self.excel_app = win32.Dispatch("Excel.Application")
             self.excel_app_start()
 
@@ -500,10 +497,10 @@ class Parser:
     """ Базовый класс парсера.
     """
 
-    def __init__(self, urls, queries_path: str, query=None):
+    def __init__(self, urls, path_to_queries: str, query=None):
 
         self.urls = urls
-        self.queries_path = queries_path
+        self.queries_path = path_to_queries
         self.query = query
         self.divs_requests: list = []  # список c ответами
         self.result: list = []
@@ -617,7 +614,7 @@ class Parser:
             for item_data in list(item_request):
                 l_message(calling_script(), f"proxy {item_data['proxy']}", color=BColors.OKGREEN)
                 try:
-                    time_start = time.monotonic()
+                    time_start = monotonic()
                     session = self.get_session()
                     self.request: Response = session.get(self.url,
                                                          headers=item_data['headers'],
@@ -647,7 +644,7 @@ class Parser:
     def _measure_time_request(function: str, t_start):
         """ Исмерение времени выполнения запросаю
         """
-        micro_seconds = (time.monotonic() - t_start) * 1000
+        micro_seconds = (monotonic() - t_start) * 1000
         l_message(function,
                   f'Время request: {micro_seconds:2.2f} ms или {str(float(round(micro_seconds / 1000, 2)))} сек.',
                   color=BColors.OKGREEN)
@@ -766,7 +763,7 @@ class Parser:
     def get_proxy_pool_from_file(self):
         """Создаём пул прокси.
         """
-        # открываем файл с ключами по пути queries_path и считываем ключи
+        # открываем файл с ключами по пути path_to_queries и считываем ключи
         with open(self.proxy_path, 'r', encoding='utf-8') as file:
             return [x.strip() for x in file if x != ""]
 
@@ -863,7 +860,7 @@ def url_constructor_yandex(queries_path, selected_base_url, selected_region, wit
     """ Формирование запросов из запчастей.
     """
     urls = []
-    # открываем файл с ключами по пути queries_path и считываем ключи
+    # открываем файл с ключами по пути path_to_queries и считываем ключи
     with open(queries_path, 'r', encoding='utf-8') as file:
         query = [x.strip() for x in file]
 
