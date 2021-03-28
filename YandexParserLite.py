@@ -1,14 +1,42 @@
 """ Парсер яндекса.
+    Все файлы, зависимости, настройки и логика в одном файле. Специально для братика :)
 """
 
-""" Перед началом работ необходимо выполнить команду pip3 install -r requirements.txt при наличии файла requirements.txt """
+""" Перед началом работ необходимо выполнить команду pip3 install -r requirements.txt при наличии файла requirements.txt 
+"""
 import inspect
 import os
-from subprocess import call
+import subprocess
 
 
-def _read_requirements(relpath):
-    fullpath = os.path.join(os.path.dirname(__file__), relpath)
+# ---------------------------------- prepare / install / checking requirements ----------------------------------
+
+def checking_requirements_txt():
+    """Проверка  файла requirements.txt
+    """
+
+    try:
+        with open(f'{"requirements.txt"}', 'r') as f:
+            requirements = f.read()
+    except FileNotFoundError:
+        assert False, 'Проверьте, что добавили файл requirements.txt'
+
+    assert 'beautifulsoup4' in requirements, 'Проверьте, что beautifulsoup4 есть в файле requirements.txt'
+    assert 'lxml' in requirements, 'Проверьте, что lxml есть в файле requirements.txt'
+    assert 'pypiwin32' in requirements, 'Проверьте, что pypiwin32 есть в файле requirements.txt'
+    assert 'certifi' in requirements, 'Проверьте, что certifi есть в файле requirements.txt'
+    assert 'urllib3' in requirements, 'Проверьте, что urllib3 есть в файле requirements.txt'
+    assert 'soupsieve' in requirements, 'Проверьте, что soupsieve есть в файле requirements.txt'
+
+
+checking_requirements_txt()
+
+
+def _read_requirements(realpath):
+    """ Чтение зависимостей из файла requirements.txt
+        requirements.txt должен находится в тойже директории / папке с этим файлом
+    """
+    fullpath = os.path.join(os.path.dirname(__file__), realpath)
     with open(fullpath) as file:
         return [s.strip() for s in file.readlines()
                 if (s.strip() and not s.startswith("#"))]
@@ -19,21 +47,18 @@ INSTALL_REQUIRES = [line for line in _REQUIREMENTS_TXT if "://" not in line]
 
 
 def prepare_venv():
+    """ принудительное обновление / создание / подготовка виртуального окружения и venv с помощью subprocess.call
+        установка зацисимостей из requirements.txt
+    """
     app_venv_name = "venv"
+
     if not os.path.exists(app_venv_name):
-        os.mkdir(f" {app_venv_name}")
+        os.makedirs(f"{app_venv_name}")
     # upgrade pip
-    call(['pip', 'install', '--upgrade'])
+    subprocess.call(['pip', 'install', '--upgrade'])
     # update requirements.txt and upgrade venv
-    call(['pip', 'install', '--upgrade'] + INSTALL_REQUIRES)
+    subprocess.call(['pip', 'install', '--upgrade'] + INSTALL_REQUIRES)
 
-
-prepare_venv()
-
-import traceback
-from datetime import datetime
-from random import choice, randint, uniform
-from time import sleep, monotonic
 
 try:
     import win32com.client as win32
@@ -59,39 +84,45 @@ try:
 except ImportError:
     raise ImportError('для установки этой библиотеки введите команду pip install requests в терминале')
 
-from tqdm import tqdm
+try:
+    from tqdm import tqdm
+except ImportError:
+    raise ImportError('для установки этой библиотеки введите команду pip install tqdm в терминале')
+
+prepare_venv()
+
+import traceback
+from datetime import datetime
+from random import choice, randint, uniform
+from time import sleep, monotonic
+
+import io
+import json
+
+
+from idna import unicode
 
 try:
-    with open(f'{"requirements.txt"}', 'r') as f:
-        requirements = f.read()
-except FileNotFoundError:
-    assert False, 'Проверьте, что добавили файл requirements.txt'
+    to_unicode = unicode
+except NameError:
+    to_unicode = str
 
-assert 'beautifulsoup4' in requirements, 'Проверьте, что beautifulsoup4 в файл requirements.txt'
-assert 'lxml' in requirements, 'Проверьте, что lxml в файл requirements.txt'
-assert 'pypiwin32' in requirements, 'Проверьте, что pypiwin32 в файл requirements.txt'
-assert 'certifi' in requirements, 'Проверьте, что certifi в файл requirements.txt'
-assert 'urllib3' in requirements, 'Проверьте, что urllib3 в файл requirements.txt'
-assert 'soupsieve' in requirements, 'Проверьте, что soupsieve в файл requirements.txt'
 
+# ---------------------------------- Setting ----------------------------------
 PASSED = False
 
-__date__ = '17.03.2021'
+__date__ = '28.03.2021'
 PARSER_NAME: str = 'ParserYandexSimplified'
 print(f'Invoking __init__.py for {__name__}')
 
 TIMEOUT = 180
 MAX_PROXYES = 25  # максимальное кооличество прокси
 REQUEST_TIMEOUT = 10.24
-print(f'Invoking __init__.py for {__name__}')
 
 HOST: str = 'https://yandex.ru'
 
 AGENTS = ['Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:61.0) Gecko/20100101 Firefox/61.0']
-# 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko)',
-# 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko)',
-# 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)',
-# 'Mozilla/5.0 (Windows NT 6.4; WOW64) AppleWebKit/537.36 (KHTML, like Gecko)']
+
 
 kad_head = {'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
             'Accept-Encoding': 'gzip, deflate',
@@ -112,14 +143,17 @@ HEADERS = {'Accept': '*/*',
 HEADERS_TEST = {'Accept': '*/*',
                 'User-Agent': choice(AGENTS)}
 
-headers_tab = {'rowNom': 'п\п',  # i_row
-               'ques': 'Ключ',  # url_ques
-               'company_title': 'Заголовок',  # my_company_title
-               'company_cid': 'Позиция',  # my_company_cid
-               'company_link_1': 'Домен',  # my_company_link_1
-               'company_sitelinks': 'Быстрая',  # my_company_site_links
-               'company_text': 'Текст',  # my_company_text
-               'company_contact': 'Контакты'}
+headers_tab = {
+    'rowNom': 'п\п',  # i_row
+    'ques': 'Ключ',  # url_ques
+    'company_title': 'Заголовок',  # my_company_title
+    'company_cid': 'Позиция',  # my_company_cid
+    'company_link_1': 'Домен',  # my_company_link_1
+    'company_url': 'URL',  # my_company_url
+    'company_fast_links': 'Быстрая',  # my_company_site_links
+    'company_text': 'Текст',  # my_company_text
+    'company_contact': 'Контакты'
+}
 
 current_dir = str(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))))
 
@@ -172,8 +206,6 @@ soup_name = 'li'
 soup_class = 'serp-item'
 soup_attribute = 'text'
 
-print(f'Invoking __init__.py for {__name__}')
-
 VIS_LOG = True  # True -  Отображение хода процесса в консоли
 PRINT_LOG = True  # True -  Запись лога в файл
 
@@ -183,6 +215,31 @@ config = {'get_main_interval': 6,
           }
 
 NOW = str(datetime.now().strftime("%d.%m.%Y %H.%M.%S")) + " :: "
+
+WRITE_TO_JSON = True
+
+# ---------------------------------- service functions ----------------------------------
+
+
+def write_json_file(*, data=None, name=""):
+    """Запись данных в json
+    """
+    with io.open(name + '.json', 'w', encoding='utf8') as outfile:
+        str_ = json.dumps(data,
+                          indent=4,
+                          sort_keys=True,
+                          separators=(',', ': '),
+                          ensure_ascii=False)
+        outfile.write(to_unicode(str_))
+
+
+def read_json_file(file) -> list:
+    """Чтение данных из json
+    """
+    with open(file, 'r', encoding='utf8') as data_file:
+        data_loaded = json.load(data_file)
+    return data_loaded
+
 
 
 class BColors:  # colors in console
@@ -287,6 +344,9 @@ def calling_script() -> object:
             str(traceback.extract_stack(None, 2)[0][0]).replace('.py', '').split('/')[-1]]
 
 
+# ----------------------------------  Writer functions ----------------------------------
+
+
 class WriterToXLSX:
     """ Создание файла XLSX и запись данных в файл XLSX.
     """
@@ -333,14 +393,17 @@ class WriterToXLSX:
                 self.wbook.Worksheets.Item(1).Cells(doc_row, 1).Value = divs_iter['rowNom']
             else:
                 self.wbook.Worksheets.Item(1).Cells(doc_row, 1).Value = doc_row - 1
+
             self.wbook.Worksheets.Item(1).Cells(doc_row, 2).Value = divs_iter['ques']
-            self.wbook.Worksheets.Item(1).Cells(doc_row, 3).Value = divs_iter['company_title']
-            self.wbook.Worksheets.Item(1).Cells(doc_row, 4).Value = divs_iter['company_cid']
-            self.wbook.Worksheets.Item(1).Cells(doc_row, 5).Value = divs_iter['company_link_1']
-            self.wbook.Worksheets.Item(1).Cells(doc_row, 6).Value = divs_iter['company_sitelinks']
+            self.wbook.Worksheets.Item(1).Cells(doc_row, 3).Value = divs_iter['company_cid']
+            self.wbook.Worksheets.Item(1).Cells(doc_row, 4).Value = divs_iter['company_link_1']
+            self.wbook.Worksheets.Item(1).Cells(doc_row, 5).Value = divs_iter['company_url']
+            self.wbook.Worksheets.Item(1).Cells(doc_row, 6).Value = divs_iter['company_title']
             self.wbook.Worksheets.Item(1).Cells(doc_row, 7).Value = divs_iter['company_text']
-            self.wbook.Worksheets.Item(1).Cells(doc_row, 8).Value = divs_iter['company_contact']
+            self.wbook.Worksheets.Item(1).Cells(doc_row, 8).Value = divs_iter['company_fast_links']
+            self.wbook.Worksheets.Item(1).Cells(doc_row, 9).Value = divs_iter['company_contact']
             doc_row += 1
+
         l_message(calling_script(), 'Данные записаны', color=BColors.OKBLUE)
 
     def insert_headers_divs_requests(self):
@@ -397,101 +460,141 @@ class WriterToXLSX:
         self.excel_app.Quit()
 
 
-def get_my_company_title(div):
-    """Найти и вернуть название компании.
-    """
-    try:
-        my_company_title: str = div.find('h2', attrs={
-            'class': "organic__title-wrapper typo typo_text_l typo_line_m"}).text.strip()
-        l_message(calling_script(), f'company_title {my_company_title}', color=BColors.OKBLUE)
+class InfoGetter:
 
-    except AttributeError as err:
-        l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
-        my_company_title: str = 'N/A'
+    def __init__(self, div):
+        self.div = div
 
-    return my_company_title
+    def get_my_company_title(self):
+        """Найти и вернуть название компании.
+        """
+        try:
+
+            # , attrs={ 'class': "organic__url-text"}
+            my_company_title: str = self.div.find('h2').text.strip()
+            l_message(calling_script(), f'company_title {my_company_title}', color=BColors.OKBLUE)
+
+        except AttributeError as err:
+            l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
+            my_company_title: str = 'N/A'
+
+        return my_company_title
+
+    def get_my_company_cid(self):
+        """Найти и вернуть порядковый номер компании на странице.
+        """
+        try:
+            my_company_cid: str = str(self.div.get('data-cid'))
+            l_message(calling_script(), f'company_cid {my_company_cid}', color=BColors.OKBLUE)
+
+        except AttributeError as err:
+            l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
+            my_company_cid: str = 'N/A'
+
+        return my_company_cid
+
+    def get_my_company_contact(self):
+        """Найти и вернуть контакты компании.
+        """
+        try:
+            my_company_contact: str = self.div.find('span', attrs={
+                'class': 'VanillaReact CoveredPhone'})
+
+            if my_company_contact is not None:
+                my_company_contact = "".join(c for c in my_company_contact['data-vnl'] if c.isdecimal())
+
+            if my_company_contact is None:
+                my_company_contact: str = 'N/A'
+
+            l_message(calling_script(), f'company_contact {my_company_contact}', color=BColors.OKBLUE)
+
+        except AttributeError as err:
+            l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
+            my_company_contact: str = 'N/A'
+
+        return my_company_contact
+
+    def get_my_company_text(self):
+        """Найти и вернуть описание компании.
+        """
+        try:
+            my_company_text: str = self.div.text
+            l_message(calling_script(), f'company_text  {my_company_text}', color=BColors.OKBLUE)
+
+            if my_company_text is None:
+                my_company_text: str = 'N/A'
+        except AttributeError as err:
+            l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
+            my_company_text: str = 'N/A'
+
+        return my_company_text
+
+    def get_my_company_fast_links(self):
+        """Найти и вернуть ссылку на сайт компании.
+        """
+        try:
+            company_fast_links: str = self.div.find('a').get('href')
+
+            l_message(calling_script(), f'company_fast_links  {company_fast_links}', color=BColors.OKBLUE)
+
+            if company_fast_links is None:
+                company_fast_links: str = 'N/A'
+
+        except AttributeError as err:
+            l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
+            company_fast_links: str = 'N/A'
+
+        return company_fast_links
+
+    def get_my_company_link_1(self):
+        """Найти и вернуть быструю ссылку на сайт компании.
+        """
+        try:
+            my_company_link_1: str =  self.div.find('a', attrs={
+                'class': 'Link Link_theme_outer Path-Item link path__item'}).find('b').text
 
 
-def get_my_company_cid(div):
-    """Найти и вернуть порядковый номер компании на странице.
-    """
-    try:
-        my_company_cid: str = str(div.get('data-cid'))
-        l_message(calling_script(), f'company_cid {my_company_cid}', color=BColors.OKBLUE)
+            if my_company_link_1 is None:
+                my_company_link_1: str = self.div.find('a', attrs={
+                    'class': '"link link_theme_outer path__item i-bem link_js_inited"'}).find('b').text
 
-    except AttributeError as err:
-        l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
-        my_company_cid: str = ''
+            if my_company_link_1 is None:
+                my_company_link_1: str = 'N/A'
 
-    return my_company_cid
+            l_message(calling_script(), f'company_link_1 {my_company_link_1}', color=BColors.OKBLUE)
 
-
-def get_my_company_contact(div):
-    """Найти и вернуть контакты компании.
-    """
-    try:
-        my_company_contact: str = div.find('div', attrs={
-            'class': 'serp-meta__item'}).text.strip()
-
-        text: int = my_company_contact.rfind('+')
-        if text > 0:
-            my_company_contact = my_company_contact[text:]
-
-        l_message(calling_script(), f'company_contact {my_company_contact}', color=BColors.OKBLUE)
-
-    except AttributeError as err:
-        l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
-        my_company_contact: str = 'N/A'
-
-    return my_company_contact
+        except AttributeError as err:
+            try:
+                my_company_link_1: str = self.div.find('a', attrs={
+                    'class': 'link link_theme_outer path__item i-bem'}).find('b').text
 
 
-def get_my_company_text(div):
-    """Найти и вернуть описание компании.
-    """
-    try:
-        my_company_text: str = div.find('div', attrs={
-            'class': 'text-container typo typo_text_m typo_line_m organic__text'}).text.strip()
-        l_message(calling_script(), f'company_text  {my_company_text}', color=BColors.OKBLUE)
+            except AttributeError as err:
+                l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
+                my_company_link_1: str = 'N/A'
 
-    except AttributeError as err:
-        l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
-        my_company_text: str = ''
+        return my_company_link_1
 
-    return my_company_text
+    def get_my_company_url(self):
+        """Найти и вернуть быструю ссылку на сайт компании.
+        """
+        try:
 
+            my_company_url: str = self.div.find('a').get('href')
 
-def get_my_company_sitelinks(div):
-    """Найти и вернуть ссылку на сайт компании.
-    """
-    try:
-        my_company_sitelinks: str = div.find('div', attrs={
-            'class': 'sitelinks sitelinks_size_m organic__sitelinks'}).text.strip()
-        l_message(calling_script(), f'company_site_links  {my_company_sitelinks}', color=BColors.OKBLUE)
+            if my_company_url is None:
+                return 'N/A'
 
-    except AttributeError as err:
-        l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
-        my_company_sitelinks: str = 'N/A'
+            l_message(calling_script(), f'company_link_1 {my_company_url}', color=BColors.OKBLUE)
 
-    return my_company_sitelinks
+        except AttributeError as err:
+            l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
+            my_company_url: str = 'N/A'
+
+        return my_company_url
 
 
-def get_my_company_link_1(div):
-    """Найти и вернуть быструю ссылку на сайт компании.
-    """
-    try:
-        my_company_link_1: str = div.find('a', attrs={
-            'class': 'link link_theme_outer path__item i-bem'}).text.strip()
-        text: int = my_company_link_1.rfind('›')
-        if text > 0:
-            my_company_link_1 = my_company_link_1[0:text]
-        l_message(calling_script(), f'company_link_1 {my_company_link_1}', color=BColors.OKBLUE)
-
-    except AttributeError as err:
-        l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
-        my_company_link_1: str = ''
-
-    return my_company_link_1
+# ---------------------------------- main class ----------------------------------
 
 
 class Parser:
@@ -814,6 +917,7 @@ class ParserYandex(Parser):
                 self.soup_request()  # обработка ответа сервера
 
                 if self.divs is not None:
+
                     self.divs_text_shelves()
                     self.result.extend(list(self.divs_requests))
                 self._time_rand(2, 4)
@@ -827,30 +931,55 @@ class ParserYandex(Parser):
     def divs_text_shelves(self):
         """ Поиск данных в ответе сайта.
         """
+
         i_row: int = 1
         for div in tqdm(self.divs):
-            my_company_title: str = get_my_company_title(div)
-            my_company_cid: str = get_my_company_cid(div)
-            my_company_link_1: str = get_my_company_link_1(div)
-            my_company_site_links: str = get_my_company_sitelinks(div)
-            my_company_text: str = get_my_company_text(div)
-            my_company_contact: str = get_my_company_contact(div)
 
-            self.divs_requests.append({'rowNom': i_row,
-                                       'ques': self.ques,
-                                       'company_title': my_company_title,
-                                       'company_cid': my_company_cid,
-                                       'company_link_1': my_company_link_1,
-                                       'company_sitelinks': my_company_site_links,
-                                       'company_text': my_company_text,
-                                       'company_contact': my_company_contact})
+            info = InfoGetter(div)
+            my_company_title: str = info.get_my_company_title()
+            my_company_cid: str = info.get_my_company_cid()
+            my_company_link_1: str = info.get_my_company_link_1()
+            my_company_site_fast_links: str = info.get_my_company_fast_links()
+            my_company_text: str = info.get_my_company_text()
+            my_company_contact: str = info.get_my_company_contact()
+            my_company_url: str = info.get_my_company_url()
+
+            if my_company_title == 'N/A' and \
+                    my_company_cid == 'N/A' and \
+                    my_company_link_1 == 'N/A' and \
+                    my_company_site_fast_links == 'N/A' and \
+                    my_company_text == 'N/A' and \
+                    my_company_contact == 'N/A' and \
+                    my_company_url == 'N/A':
+                return
+
+            self.divs_requests.append(
+                {
+                    'rowNom': i_row,
+                    'ques': self.ques,
+                    'company_title': my_company_title,
+                    'company_cid': my_company_cid,
+                    'company_link_1': my_company_link_1,
+                    'company_fast_links': my_company_site_fast_links,
+                    'company_text': my_company_text,
+                    'company_contact': my_company_contact,
+                    'company_url': my_company_url
+                }
+            )
             i_row = i_row + 1
 
     def write_data_to_file(self):
         """ Запись данных в файл.
         """
+
+        if WRITE_TO_JSON:
+            write_json_file(data=self.divs_requests, name="divs")
+
         file_writer = WriterToXLSX(self.divs_requests, self.full_path)
         file_writer.file_writer()
+
+
+# ---------------------------------- constructor url ----------------------------------
 
 
 def url_constructor_yandex(queries_path, selected_base_url, selected_region, within_time, num_doc=10, max_pos=3):
