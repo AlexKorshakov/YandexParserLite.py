@@ -1,20 +1,31 @@
 """ Парсер яндекса.
-    Все файлы, зависимости, настройки и логика в одном файле. Специально для братика :)
+    Все файлы, зависимости, настройки и логика в одном файле.
+    Специально для братика :)
+"""
+from os import listdir
+
+""" Перед началом работ необходимо выполнить команду python -m pip install --upgrade pip для обновлния pip 
 """
 
 """ Перед началом работ необходимо выполнить команду pip3 install -r requirements.txt при наличии файла requirements.txt 
 """
-import inspect
-import os
-import subprocess
-
 
 # ---------------------------------- prepare / install / checking requirements ----------------------------------
+import inspect
+import io
+import json
+import os
+import subprocess
+from datetime import datetime
+from random import choice, randint, uniform
+from time import monotonic, sleep
+
+from idna import unicode
+
 
 def checking_requirements_txt():
     """Проверка  файла requirements.txt
     """
-
     try:
         with open(f'{"requirements.txt"}', 'r') as f:
             requirements = f.read()
@@ -60,6 +71,8 @@ def prepare_venv():
     subprocess.call(['pip', 'install', '--upgrade'] + INSTALL_REQUIRES)
 
 
+prepare_venv()
+
 try:
     import win32com.client as win32
     from win32com.universal import com_error
@@ -89,60 +102,82 @@ try:
 except ImportError:
     raise ImportError('для установки этой библиотеки введите команду pip install tqdm в терминале')
 
-prepare_venv()
+try:
+    import traceback
+except ImportError:
+    raise ImportError('для установки этой библиотеки введите команду pip install traceback в терминале')
 
-import traceback
-from datetime import datetime
-from random import choice, randint, uniform
-from time import sleep, monotonic
+try:
+    from selenium import webdriver
+except ImportError:
+    raise ImportError('для установки этой библиотеки введите команду pip install selenium в терминале')
 
-import io
-import json
-
-
-from idna import unicode
+try:
+    from webdriver_manager.chrome import ChromeDriverManager
+except ImportError:
+    raise ImportError('для установки этой библиотеки введите команду pip install webdriver_manager в терминале')
 
 try:
     to_unicode = unicode
 except NameError:
     to_unicode = str
 
-
 # ---------------------------------- Setting ----------------------------------
+
+# включение отладки
 PASSED = False
 
 __date__ = '28.03.2021'
+__author__ = 'kokkaina13@gmail.com (Alex Korshakov)'
 PARSER_NAME: str = 'ParserYandexSimplified'
 print(f'Invoking __init__.py for {__name__}')
 
+# время ожидания
 TIMEOUT = 180
-MAX_PROXYES = 25  # максимальное кооличество прокси
+
+# максимальное кооличество прокси
+MAX_PROXYES = 25
+
+# время ожидания между отправкой повторного запроса
 REQUEST_TIMEOUT = 10.24
 
+# базовый url  для отправки запросов
 HOST: str = 'https://yandex.ru'
 
-AGENTS = ['Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:61.0) Gecko/20100101 Firefox/61.0']
+# агент представления запроса
+AGENTS = [
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36"
+]
 
+# альтернативные заголовки запроса
+kad_head = {
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Encoding': 'gzip, deflate',
+    'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4',
+    'Cache-Control': 'max-age=0',
+    'Connection': 'keep-alive',
+    'Host': HOST,
+    'Upgrade-Insecure-Requests': '1',
+    'User-Agent': choice(AGENTS)
+}
 
-kad_head = {'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-            'Accept-Encoding': 'gzip, deflate',
-            'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4',
-            'Cache-Control': 'max-age=0',
-            'Connection': 'keep-alive',
-            'Host': HOST,
-            'Upgrade-Insecure-Requests': '1',
-            'User-Agent': choice(AGENTS)}
+# используемые заголовки запроса
+HEADERS = {
+    'Accept': '*/*',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+    'Cache-Control': 'max-age=0',
+    'host': HOST,
+    'User-Agent': choice(AGENTS)
+}
 
-HEADERS = {'Accept': '*/*',
-           'Connection': 'keep-alive',
-           'Upgrade-Insecure-Requests': '1',
-           'Cache-Control': 'max-age=0',
-           'host': HOST,
-           'User-Agent': choice(AGENTS)}
+# базовые заголовки запроса
+HEADERS_TEST = {
+    'Accept': '*/*',
+    'User-Agent': choice(AGENTS)
+}
 
-HEADERS_TEST = {'Accept': '*/*',
-                'User-Agent': choice(AGENTS)}
-
+# заголовки таблицы выгрузки
 headers_tab = {
     'rowNom': 'п\п',  # i_row
     'ques': 'Ключ',  # url_ques
@@ -155,30 +190,44 @@ headers_tab = {
     'company_contact': 'Контакты'
 }
 
+# ---------------------------------- Servis Setting ----------------------------------
+
+
+# лимит на колличество запросов с одного ip
+RESPONSE_LIMIT: int = 150
+
+# текущая директория
 current_dir = str(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))))
 
-# базовый запрос
-base_url_yandex: str = 'https://www.yandex.ru/search/ads?text='
-
+# текущая дата
 date_today = datetime.today().strftime("%d.%m.%Y")
+
+# полный путь к текущей директории
 full_path = current_dir + '\\'
+
+# базовое расширение файла выгрузки
 extension = '.xlsx'
 
 # задаём полный путь к файлу с выгрузкой
-report_name = '/Parser_Yandex.xlsx'
+report_name: str = 'Parser_Yandex.xlsx'
 
-# задаём полный путь к файлу с ключами
-queries_path = 'queries.txt'
+# полный путь к файлу с ключами
+queries_path: str = 'queries.txt'
 
-proxy_path = 'proxieslist.txt'
+# полный путь к файлу с прокси
+proxy_path: str = 'proxieslist.txt'
+
+# ---------------------------------- URL Setting ----------------------------------
+
+# базовый запрос
+base_url_yandex: str = 'https://www.yandex.ru/search/ads?text='
 
 # задаём максимальное кооличество запросов
 url_max_pos_yandex = 2
 
 # Задаём регион. Санкт-Петербург – 2. Краснодар  - 35
 # Список идентификаторов российских регионов https://tech.yandex.ru/xml/doc/dg/reference/regions-docpage/
-region_yandex = 35
-region_google = '+' + 'Краснодар'
+region_yandex: int = 35
 
 # период
 # 1 – последние две недели;
@@ -191,22 +240,26 @@ region_google = '+' + 'Краснодар'
 # 77 – сутки(24 часа, независимо от того, сколько длятся секущие сутки);
 # 8 – трое суток;
 # 9 – неделя
-within_time = 5
+within_time: int = 5
 
 # колличество ссылок в каждой выдаче
-num_doc = 10  # не рекомендуется менять от слова совсем
+num_doc: int = 10  # не рекомендуется менять от слова совсем
 # – определяет количество документов (ссылок), отображаемых на одной странице результатов выдачи.
 #  по умолчанию = 10
 # колличество одновременных процессов / потоков
-max_process = 1
+max_process: int = 1
 
-# параметры парсинга ответов
+# ---------------------------------- Pars Setting ----------------------------------
+
 
 soup_name = 'li'
 soup_class = 'serp-item'
 soup_attribute = 'text'
 
-VIS_LOG = True  # True -  Отображение хода процесса в консоли
+# ---------------------------------- LOG Setting ----------------------------------
+
+
+VIS_LOG = False  # True -  Отображение хода процесса в консоли
 PRINT_LOG = True  # True -  Запись лога в файл
 
 config = {'get_main_interval': 6,
@@ -217,6 +270,12 @@ config = {'get_main_interval': 6,
 NOW = str(datetime.now().strftime("%d.%m.%Y %H.%M.%S")) + " :: "
 
 WRITE_TO_JSON = True
+
+# ---------------------------------- browser setting ----------------------------------
+
+
+BROWSER_SPEED: int = 1
+
 
 # ---------------------------------- service functions ----------------------------------
 
@@ -241,7 +300,6 @@ def read_json_file(file) -> list:
     return data_loaded
 
 
-
 class BColors:  # colors in console
     """ Список кодов основных цветов для системных сообщений.
     """
@@ -259,7 +317,6 @@ def decorate_msg(msg, color=None) -> str:
     """ Returns: colored msg, if colors are enabled in config and a color is provided for msg
         msg, otherwise
     """
-
     msg_string = msg
     if config['colors']:
         msg_string = color + msg + BColors.ENDC
@@ -272,7 +329,6 @@ def write_to_console(*, param_name: str = None, p_value=None):
     try:
         if param_name == 'NLine':
             print('=' * 100)
-
         try:
             if len(p_value) < 100:
                 print(NOW + f'Параметр {param_name} Значение: {p_value}')
@@ -313,7 +369,6 @@ def l_message(names=None, value=None, color=None, r_log=None, r_print=None) -> N
     """ Функция логирования в файл и отображения данны в терминале.
     :rtype: None
     """
-
     if isinstance(r_log, type(None)):
         r_log = VIS_LOG
     if isinstance(r_print, type(None)):
@@ -339,7 +394,6 @@ def calling_script() -> object:
     """ Получение имени вызывающей функции.
     :rtype: object
     """
-
     return [str(traceback.extract_stack(None, 2)[0][2]),
             str(traceback.extract_stack(None, 2)[0][0]).replace('.py', '').split('/')[-1]]
 
@@ -358,8 +412,8 @@ class WriterToXLSX:
         self.full_path_to_file = full_path_to_file
 
     def file_writer(self):
-        """Записываем данные в файл Excel."""
-
+        """Записываем данные в файл Excel.
+        """
         if len(self.divs_requests) == 0:
             l_message(calling_script(), '\n Нет данных для записи в файл! \n', color=BColors.FAIL)
             return
@@ -383,8 +437,8 @@ class WriterToXLSX:
             return
 
     def _write_to_sheet(self):
-        """Запись данных на лист."""
-
+        """Запись данных на лист.
+        """
         l_message(calling_script(), 'Начало записи данных в файл', color=BColors.OKBLUE)
         doc_row: int = 1
         for divs_iter in self.divs_requests:  # записываем данные
@@ -407,14 +461,14 @@ class WriterToXLSX:
         l_message(calling_script(), 'Данные записаны', color=BColors.OKBLUE)
 
     def insert_headers_divs_requests(self):
-        """Создание заголовков в list с распарсенными данными."""
-
+        """Создание заголовков в list с распарсенными данными.
+        """
         return self.divs_requests.insert(0, headers_tab)
 
     @property
     def create_workbook(self):
-        """ Создание обектов приложения Excel и обьекта страницы."""
-
+        """ Создание обектов приложения Excel и обьекта страницы.
+        """
         try:
             self.excel_app = win32.Dispatch("Excel.Application")
             self.excel_app_start()
@@ -445,15 +499,15 @@ class WriterToXLSX:
         return self.excel_app, self.wbook
 
     def excel_app_start(self):
-        """ Старт приложения Excel"""
-
+        """ Старт приложения Excel
+        """
         self.excel_app.DisplayAlerts = False  # отключаем обновление экрана
         self.excel_app.Visible = False
         self.excel_app.ScreenUpdating = False
 
     def excel_app_quit(self):
-        """Выход из приложения Excel"""
-
+        """Выход из приложения Excel
+        """
         self.excel_app.DisplayAlerts = True  # отключаем обновление экрана
         self.excel_app.Visible = True
         self.excel_app.ScreenUpdating = True
@@ -461,6 +515,8 @@ class WriterToXLSX:
 
 
 class InfoGetter:
+    """Класс с функциями получениями данных из частей распарсенного ответа
+    """
 
     def __init__(self, div):
         self.div = div
@@ -469,7 +525,6 @@ class InfoGetter:
         """Найти и вернуть название компании.
         """
         try:
-
             # , attrs={ 'class': "organic__url-text"}
             my_company_title: str = self.div.find('h2').text.strip()
             l_message(calling_script(), f'company_title {my_company_title}', color=BColors.OKBLUE)
@@ -550,9 +605,8 @@ class InfoGetter:
         """Найти и вернуть быструю ссылку на сайт компании.
         """
         try:
-            my_company_link_1: str =  self.div.find('a', attrs={
+            my_company_link_1: str = self.div.find('a', attrs={
                 'class': 'Link Link_theme_outer Path-Item link path__item'}).find('b').text
-
 
             if my_company_link_1 is None:
                 my_company_link_1: str = self.div.find('a', attrs={
@@ -563,11 +617,10 @@ class InfoGetter:
 
             l_message(calling_script(), f'company_link_1 {my_company_link_1}', color=BColors.OKBLUE)
 
-        except AttributeError as err:
+        except AttributeError:
             try:
                 my_company_link_1: str = self.div.find('a', attrs={
                     'class': 'link link_theme_outer path__item i-bem'}).find('b').text
-
 
             except AttributeError as err:
                 l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
@@ -598,18 +651,18 @@ class InfoGetter:
 
 
 class Parser:
-    """ Базовый класс парсера.
+    """ Базовый класс парсера с основными функциями
     """
 
-    def __init__(self, urls, path_to_queries: str, query=None):
+    def __init__(self, urls, path_to_queries: str = None, query=None):
 
-        self.urls = urls
+        self.urls = None
         self.queries_path = path_to_queries
         self.query = query
         self.divs_requests: list = []  # список c ответами
         self.result: list = []
 
-        self.headers = []
+        self.headers: list = []
         self.divs = None
         self.ques = None
         self.url = None
@@ -625,10 +678,12 @@ class Parser:
         self.soup_class = None
         self.soup_attribute = None
 
-    def start_work(self):
+    def start_pars(self, urls):
         """ Определение начало работы в базовом классе.
         """
         assert self.urls is not None, f"{calling_script()} urls not passed"
+
+        self.urls = urls
 
         for number, item_url in enumerate(self.urls):
             l_message(calling_script(), f"\nЗапрос номер: {number + 1} \n", color=BColors.OKBLUE)
@@ -637,7 +692,7 @@ class Parser:
                 self.url = item_url['url']
                 self.ques = item_url['ques']
 
-                if number <= 100:
+                if number <= RESPONSE_LIMIT:
                     self.get_response()
                 else:
                     self.proxyes = self.get_proxy_pool_from_file()
@@ -712,7 +767,7 @@ class Parser:
 
         for request_number, item_request in enumerate(list(data_requests)):
 
-            if request_number >= 100:
+            if request_number >= RESPONSE_LIMIT:
                 return
 
             for item_data in list(item_request):
@@ -868,22 +923,15 @@ class Parser:
             return [x.strip() for x in file if x != ""]
 
 
+# ---------------------------------- Parser class ----------------------------------
+
+
 class ParserYandex(Parser):
     """ Класс парсера Яндекса наследуется от базового парсера.
     """
 
-    def __init__(self, *, urls):
-        super(ParserYandex, self).__init__(self, urls)
-        self.urls = urls
-
-        self.divs_requests: list = []
-        self.result: list = []
-        self.proxyes: list = []  # создаем список c прокси
-
-        self.ques = None
-        self.url = None
-        self.request = None
-        self.divs = None
+    def __init__(self, ):
+        super(ParserYandex, self).__init__(self)
 
         self.headers = [HEADERS_TEST, kad_head]
         self.full_path_to_file = full_path
@@ -896,19 +944,21 @@ class ParserYandex(Parser):
         self.soup_class = soup_class
         self.soup_attribute = soup_attribute
 
-    def start_work(self):
+    def start_pars(self, urls):
         """ функция парсера.
         """
-        assert self.urls is not None, str(calling_script()) + 'urls not passed'
+        assert urls is not None, str(calling_script()) + 'urls not passed'
 
-        for number, item_url in enumerate(self.urls):
-            l_message(calling_script(), f"\nЗапрос номер: {number + 1} \n", color=BColors.OKBLUE)
+        self.urls = urls
+
+        for response_number, item_url in enumerate(self.urls):
+            l_message(calling_script(), f"\nЗапрос номер: {response_number + 1} \n", color=BColors.OKBLUE)
 
             try:
                 self.url = item_url['url']
                 self.ques = item_url['ques']
 
-                if number <= 100:
+                if response_number <= RESPONSE_LIMIT:
                     self.get_response()
                 else:
                     self.proxyes = self.get_proxy_pool_from_file()
@@ -917,10 +967,27 @@ class ParserYandex(Parser):
                 self.soup_request()  # обработка ответа сервера
 
                 if self.divs is not None:
-
                     self.divs_text_shelves()
                     self.result.extend(list(self.divs_requests))
                 self._time_rand(2, 4)
+
+            except ConnectionError as err:
+                l_message(calling_script(), f" ConnectionError: {repr(err)}", color=BColors.FAIL)
+                continue
+
+        self.write_data_to_file()
+
+    def start_pars_with_selenium(self, urls):
+        """ Функция парсера.
+        """
+        assert urls is not None, str(calling_script()) + 'urls not passed'
+
+        for response_number, item_url in enumerate(self.urls):
+            l_message(calling_script(), f"\nЗапрос номер: {response_number + 1} \n", color=BColors.OKBLUE)
+
+            try:
+                self.divs_text_shelves()
+                self.result.extend(list(self.divs_requests))
 
             except ConnectionError as err:
                 l_message(calling_script(), f" ConnectionError: {repr(err)}", color=BColors.FAIL)
@@ -979,8 +1046,248 @@ class ParserYandex(Parser):
         file_writer.file_writer()
 
 
-# ---------------------------------- constructor url ----------------------------------
+class ParserYandexWithSelenium(Parser):
+    """ Класс парсера Яндекса наследуется от базового парсера.
+    """
 
+    def __init__(self, ):
+        super(ParserYandexWithSelenium, self).__init__(self)
+
+        self.divs = None
+        self.full_path = full_path + PARSER_NAME + ' ' + date_today + extension
+        self.fold_path = "\\page"
+        self.seleenium_divs = []
+        self.soup_attribute = soup_attribute
+
+    def write_data_to_file(self):
+        """ Запись данных в файл.
+        """
+
+        if WRITE_TO_JSON:
+            write_json_file(data=self.divs_requests, name="divs")
+
+        file_writer = WriterToXLSX(self.divs_requests, self.full_path)
+        file_writer.file_writer()
+
+    def get_content_with_selenium(self, urls):
+        """
+        """
+        webdriver = Webdriver(proxy='')
+        webdriver.creat()
+
+        for number, url in enumerate(urls):
+            webdriver.get_content(number, url)
+            sleep(5)
+
+        webdriver.close_and_quit()
+
+    def divs_text_shelves(self):
+        """ Поиск данных в ответе сайта.
+        """
+        i_row: int = 1
+        for div in tqdm(self.divs):
+
+            info = InfoGetter(div)
+            my_company_title: str = info.get_my_company_title()
+            my_company_cid: str = info.get_my_company_cid()
+            my_company_link_1: str = info.get_my_company_link_1()
+            my_company_site_fast_links: str = info.get_my_company_fast_links()
+            my_company_text: str = info.get_my_company_text()
+            my_company_contact: str = info.get_my_company_contact()
+            my_company_url: str = info.get_my_company_url()
+
+            if my_company_title == 'N/A' and \
+                    my_company_cid == 'N/A' and \
+                    my_company_link_1 == 'N/A' and \
+                    my_company_site_fast_links == 'N/A' and \
+                    my_company_text == 'N/A' and \
+                    my_company_contact == 'N/A' and \
+                    my_company_url == 'N/A':
+                return
+
+            self.divs_requests.append(
+                {
+                    'rowNom': i_row,
+                    'ques': self.ques,
+                    'company_title': my_company_title,
+                    'company_cid': my_company_cid,
+                    'company_link_1': my_company_link_1,
+                    'company_fast_links': my_company_site_fast_links,
+                    'company_text': my_company_text,
+                    'company_contact': my_company_contact,
+                    'company_url': my_company_url
+                }
+            )
+            i_row = i_row + 1
+
+    def get_content_from_file(self, file):
+        with open(current_dir + self.fold_path + "\\" + file, encoding='utf-8') as file:
+            self.content = file.read()
+        return self.content
+
+    def get_selenium_divs(self):
+        # перебираем список файлов в папке
+        for filename in listdir(current_dir + self.fold_path):
+            self.seleenium_divs.append(filename)
+
+            # with open(filename) as file:
+            #     self.content = file.read()
+            #     return self.content
+
+            # soup = BeautifulSoup(src, "lxml")
+            # hotels_cards = soup.find_all("div", class_="hotel_card_dv")
+            #
+            # for hotel_url in hotels_cards:
+            #     hotel_url = "https://www.tury.ru" + hotel_url.find("a").get("href")
+            #     print(hotel_url)
+
+    def soup_request(self):
+        """ Обработка ответа с помощью BeautifulSoup. Если есть нужные данные - передаёт на поиск нужных данных в
+            divs_text_shelves.
+        """
+        # if not hasattr(self.content, self.soup_attribute):
+        #     l_message(calling_script(), 'Ответ не содержит текст :(', color=BColors.FAIL)
+        #     return
+
+        # if self.content.text == '':
+        #     l_message(calling_script(), 'Ответ не содержит текстовых данных :(', color=BColors.FAIL)
+        #     return
+
+        soup = BeautifulSoup(self.content, 'lxml')  # ответ
+        self.divs = soup.find_all(class_=self.soup_class)  # данные ответа
+
+        if self.divs is None or len(self.divs) == 0:
+            l_message(calling_script(), 'Ответ не содержит нужных данных :(', color=BColors.FAIL)
+            return
+
+        l_message(calling_script(), f'Всего найдено блоков {str(len(self.divs))}', color=BColors.OKBLUE)
+
+    def start_pars(self, **kwargs):
+        """ функция парсера.
+        :param **kwargs:
+        """
+        self.get_selenium_divs()
+
+        assert self.seleenium_divs is not None, str(calling_script()) + 'divs is None'
+
+        for divs_number, item_divs in enumerate(self.seleenium_divs):
+            l_message(calling_script(), f"\nСтраница номер: {divs_number + 1} \n", color=BColors.OKBLUE)
+
+            self.get_content_from_file(file=item_divs)
+
+            self.soup_request()
+            self.divs_text_shelves()
+            self.result.extend(list(self.divs_requests))
+
+        self.write_data_to_file()
+
+
+# ---------------------------------- Webdriver class ----------------------------------
+
+
+class Webdriver:
+    """ Класс webdriver - основной движок для получения данных сайта
+    """
+
+    def __init__(self, proxy=''):
+        self.proxy = proxy
+        self.chrome_driver = None
+        self.options = None
+        self.content = None
+
+    def creat(self):
+        """ Создание webdriver с опциями
+        """
+        self.options = self.creat_options()
+        self.chrome_driver = self.creat_webdriver()
+        l_message(calling_script(), f'webdriver creat', color=BColors.OKBLUE)
+
+    def set_config(self) -> None:
+        """ Установление дополнительных опций работы webdriver
+        """
+        # set timeout to find an element in seconds
+        self.chrome_driver.implicitly_wait(5 * BROWSER_SPEED)
+
+        # set page load timeout in seconds
+        self.chrome_driver.set_page_load_timeout(15 + BROWSER_SPEED)
+
+    def creat_options(self):
+        """ Создание опция для webdriver
+        """
+        self.options = webdriver.ChromeOptions()
+        self.options.add_argument("window-size=1366,768")
+        self.options.add_argument("--disable-blink-features=AutomationControlled")
+        self.options.add_argument("no-sandbox")
+        self.options.add_argument("headless")
+        self.options.add_argument(f"user-agent={AGENTS}")
+
+        if self.proxy != "":
+            self.options.add_argument(f"proxy-server={self.proxy}")
+
+        return self.options
+
+    def creat_webdriver(self):
+        """Создание webdriver
+        """
+        return webdriver.Chrome(ChromeDriverManager().install(), options=self.options)
+
+    @staticmethod
+    def creat_folder():
+        """Создание папки для сохранеиения загруженных страниц
+        """
+        if not os.path.exists('page'):
+            os.mkdir('page')
+
+    def close_and_quit(self):
+        """ Закрытие и уничтожение экземпляра webdriver
+        """
+        self.chrome_driver.close()
+        self.chrome_driver.quit()
+
+    def write_content(self, number):
+        """Запись содержимого страницы
+        :param number:
+        """
+        self.creat_folder()
+
+        file = 'page/' + str(number) + "_index_page.html"
+
+        with open(file=file, mode="w", encoding="utf-8") as source_file:
+            source_file.write(self.content)
+
+        l_message(calling_script(), f'content write in {file}',
+                  color=BColors.OKBLUE)
+
+    def get_content(self, number, url):
+        """Получение контекта загруженной страницы
+        """
+        try:
+            self.chrome_driver.get(url=url['url'])
+            l_message(calling_script(), f"content get", color=BColors.OKBLUE)
+            self.set_config()
+
+            self.content = self.chrome_driver.page_source
+
+            self.write_content(number)
+
+        except Exception as err:
+            l_message(calling_script(), f" Exception: {repr(err)}", color=BColors.FAIL)
+            self.close_and_quit()
+
+    def get_content_from_file(self):
+        with open("index_selenium.html") as file:
+            self.content = file.read()
+        return self.content
+
+    # soup = BeautifulSoup(src, "lxml")
+    # hotels_cards = soup.find_all("div", class_="hotel_card_dv")
+    #
+    # for hotel_url in hotels_cards:
+    #     hotel_url = "https://www.tury.ru" + hotel_url.find("a").get("href")
+    #     print(hotel_url)
+
+
+# ---------------------------------- constructor url ----------------------------------
 
 def url_constructor_yandex(queries_path, selected_base_url, selected_region, within_time, num_doc=10, max_pos=3):
     """ Формирование запросов из запчастей.
@@ -988,7 +1295,7 @@ def url_constructor_yandex(queries_path, selected_base_url, selected_region, wit
     urls = []
     # открываем файл с ключами по пути path_to_queries и считываем ключи
     with open(queries_path, 'r', encoding='utf-8') as file:
-        query = [x.strip() for x in file]
+        query = [x.strip() for x in file if x != '']
 
     for ques in query:  # перебираем ключи и формируем url на их основе
         divs_ques: str = ques
@@ -1011,6 +1318,19 @@ def url_constructor_yandex(queries_path, selected_base_url, selected_region, wit
     return urls
 
 
+def get_content_with_selenium(urls):
+    """
+    """
+    webdriver = Webdriver(proxy='')
+    webdriver.creat()
+
+    for number, url in enumerate(urls):
+        webdriver.get_content(number, url)
+        sleep(5)
+
+    webdriver.close_and_quit()
+
+
 def main():
     """Основная функция с параметрами.
     """
@@ -1019,8 +1339,12 @@ def main():
     urls = url_constructor_yandex(queries_path, base_url_yandex, region_yandex, within_time, num_doc,
                                   url_max_pos_yandex)
 
-    parser = ParserYandex(urls=urls)
-    parser.start_work()
+    # parser_selenium = ParserYandexWithSelenium()
+    # parser_selenium.get_content_with_selenium(urls=urls)
+    # parser_selenium.start_pars()
+
+    parser = ParserYandex()
+    parser.start_pars(urls=urls)
 
     l_message(calling_script(), '\n**** Done ****\n', color=BColors.OKBLUE)
 

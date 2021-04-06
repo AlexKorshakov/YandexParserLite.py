@@ -5,6 +5,10 @@ import os
 
 
 def _read_reqs(relpath):
+    """
+    Args:
+        relpath:
+    """
     fullpath = os.path.join(os.path.dirname(__file__), relpath)
     with open(fullpath) as f:
         return [s.strip() for s in f.readlines()
@@ -30,4 +34,6 @@ setuptools.setup(
         "reco_module": ["configs/*.yaml"],
     },
     data_files=[('.', ['requirements.txt', 'tests-requirements.txt'])],
-    packages=setuptools.find_packages())
+    packages=setuptools.find_packages()
+)
+
