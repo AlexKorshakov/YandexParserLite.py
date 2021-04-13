@@ -11,6 +11,8 @@ from os import listdir
 """
 
 # ---------------------------------- prepare / install / checking requirements ----------------------------------
+
+
 import inspect
 import io
 import json
@@ -185,7 +187,7 @@ headers_tab = {
     'company_cid': 'Позиция',  # my_company_cid
     'company_link_1': 'Домен',  # my_company_link_1
     'company_url': 'URL',  # my_company_url
-    'company_fast_links': 'Быстрая',  # my_company_site_links
+    'company_fast_links': 'БС',  # my_company_site_links
     'company_text': 'Текст',  # my_company_text
     'company_contact': 'Контакты'
 }
@@ -283,13 +285,16 @@ BROWSER_SPEED: int = 1
 def write_json_file(*, data=None, name=""):
     """Запись данных в json
     """
-    with io.open(name + '.json', 'w', encoding='utf8') as outfile:
-        str_ = json.dumps(data,
-                          indent=4,
-                          sort_keys=True,
-                          separators=(',', ': '),
-                          ensure_ascii=False)
-        outfile.write(to_unicode(str_))
+    try:
+        with io.open(name + '.json', 'w', encoding='utf8') as outfile:
+            str_ = json.dumps(data,
+                              indent=4,
+                              sort_keys=True,
+                              separators=(',', ': '),
+                              ensure_ascii=False)
+            outfile.write(to_unicode(str_))
+    except TypeError as err:
+        l_message(calling_script(), f" TypeError: {repr(err)}", color=BColors.FAIL)
 
 
 def read_json_file(file) -> list:
@@ -455,7 +460,7 @@ class WriterToXLSX:
             self.wbook.Worksheets.Item(1).Cells(doc_row, 6).Value = divs_iter['company_title']
             self.wbook.Worksheets.Item(1).Cells(doc_row, 7).Value = divs_iter['company_text']
             self.wbook.Worksheets.Item(1).Cells(doc_row, 8).Value = divs_iter['company_fast_links']
-            self.wbook.Worksheets.Item(1).Cells(doc_row, 9).Value = divs_iter['company_contact']
+
             doc_row += 1
 
         l_message(calling_script(), 'Данные записаны', color=BColors.OKBLUE)
@@ -525,9 +530,9 @@ class InfoGetter:
         """Найти и вернуть название компании.
         """
         try:
-            # , attrs={ 'class': "organic__url-text"}
-            my_company_title: str = self.div.find('h2').text.strip()
-            l_message(calling_script(), f'company_title {my_company_title}', color=BColors.OKBLUE)
+            my_company_title = self.div.find('div', attrs={
+                'class': "OrganicTitle-LinkText organic__url-text"}).text
+            l_message(calling_script(), f'my_company_text {my_company_title}', color=BColors.OKBLUE)
 
         except AttributeError as err:
             l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
@@ -573,14 +578,13 @@ class InfoGetter:
         """Найти и вернуть описание компании.
         """
         try:
-            my_company_text: str = self.div.text
+            my_company_text = self.div.find('div', attrs={
+                'class': "text-container typo typo_text_m typo_line_m organic__text"}).text
             l_message(calling_script(), f'company_text  {my_company_text}', color=BColors.OKBLUE)
 
-            if my_company_text is None:
-                my_company_text: str = 'N/A'
-        except AttributeError as err:
-            l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
-            my_company_text: str = 'N/A'
+        except AttributeError:
+            my_company_text: str = self.div.text
+            l_message(calling_script(), f'company_text  {my_company_text}', color=BColors.OKBLUE)
 
         return my_company_text
 
@@ -588,18 +592,28 @@ class InfoGetter:
         """Найти и вернуть ссылку на сайт компании.
         """
         try:
-            company_fast_links: str = self.div.find('a').get('href')
+            company_fast_links: str = self.div.find_all('div', attrs={
+                'class': 'Sitelinks-Item sitelinks__item'})
+
+            link_string = ''
+            for link in company_fast_links:
+                try:
+                    link_string = link_string + link.text + " "
+                except AttributeError:
+                    continue
 
             l_message(calling_script(), f'company_fast_links  {company_fast_links}', color=BColors.OKBLUE)
 
-            if company_fast_links is None:
+            if company_fast_links is None or company_fast_links == []:
                 company_fast_links: str = 'N/A'
+                return company_fast_links
 
         except AttributeError as err:
             l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
             company_fast_links: str = 'N/A'
+            return company_fast_links
 
-        return company_fast_links
+        return link_string
 
     def get_my_company_link_1(self):
         """Найти и вернуть быструю ссылку на сайт компании.
@@ -654,7 +668,7 @@ class Parser:
     """ Базовый класс парсера с основными функциями
     """
 
-    def __init__(self, urls, path_to_queries: str = None, query=None):
+    def __init__(self, path_to_queries: str = None, query=None):
 
         self.urls = None
         self.queries_path = path_to_queries
@@ -1054,9 +1068,10 @@ class ParserYandexWithSelenium(Parser):
         super(ParserYandexWithSelenium, self).__init__(self)
 
         self.divs = None
+        self.content = None
         self.full_path = full_path + PARSER_NAME + ' ' + date_today + extension
         self.fold_path = "\\page"
-        self.seleenium_divs = []
+        self.selenium_divs = []
         self.soup_attribute = soup_attribute
 
     def write_data_to_file(self):
@@ -1069,17 +1084,18 @@ class ParserYandexWithSelenium(Parser):
         file_writer = WriterToXLSX(self.divs_requests, self.full_path)
         file_writer.file_writer()
 
-    def get_content_with_selenium(self, urls):
+    @staticmethod
+    def get_content_with_selenium(urls):
+        """Загрузка страницы целеком с помощью selenium
         """
-        """
-        webdriver = Webdriver(proxy='')
-        webdriver.creat()
+        web_driver = Webdriver(proxy='')
+        web_driver.create()
 
         for number, url in enumerate(urls):
-            webdriver.get_content(number, url)
+            web_driver.get_content(number, url)
             sleep(5)
 
-        webdriver.close_and_quit()
+        web_driver.close_and_quit()
 
     def divs_text_shelves(self):
         """ Поиск данных в ответе сайта.
@@ -1106,52 +1122,37 @@ class ParserYandexWithSelenium(Parser):
                 return
 
             self.divs_requests.append(
-                {
-                    'rowNom': i_row,
-                    'ques': self.ques,
-                    'company_title': my_company_title,
-                    'company_cid': my_company_cid,
-                    'company_link_1': my_company_link_1,
-                    'company_fast_links': my_company_site_fast_links,
-                    'company_text': my_company_text,
-                    'company_contact': my_company_contact,
-                    'company_url': my_company_url
-                }
+                {'rowNom': i_row,
+                 'ques': self.ques,
+                 'company_title': my_company_title,
+                 'company_cid': my_company_cid,
+                 'company_link_1': my_company_link_1,
+                 'company_fast_links': my_company_site_fast_links,
+                 'company_text': my_company_text,
+                 'company_contact': my_company_contact,
+                 'company_url': my_company_url}
             )
             i_row = i_row + 1
 
     def get_content_from_file(self, file):
+        """Получение данных из файйла .html
+        :param file:
+        :return:
+        """
         with open(current_dir + self.fold_path + "\\" + file, encoding='utf-8') as file:
             self.content = file.read()
         return self.content
 
     def get_selenium_divs(self):
-        # перебираем список файлов в папке
+        """Поиск файлов в папке fold_path
+        """
         for filename in listdir(current_dir + self.fold_path):
-            self.seleenium_divs.append(filename)
-
-            # with open(filename) as file:
-            #     self.content = file.read()
-            #     return self.content
-
-            # soup = BeautifulSoup(src, "lxml")
-            # hotels_cards = soup.find_all("div", class_="hotel_card_dv")
-            #
-            # for hotel_url in hotels_cards:
-            #     hotel_url = "https://www.tury.ru" + hotel_url.find("a").get("href")
-            #     print(hotel_url)
+            self.selenium_divs.append(filename)
 
     def soup_request(self):
         """ Обработка ответа с помощью BeautifulSoup. Если есть нужные данные - передаёт на поиск нужных данных в
             divs_text_shelves.
         """
-        # if not hasattr(self.content, self.soup_attribute):
-        #     l_message(calling_script(), 'Ответ не содержит текст :(', color=BColors.FAIL)
-        #     return
-
-        # if self.content.text == '':
-        #     l_message(calling_script(), 'Ответ не содержит текстовых данных :(', color=BColors.FAIL)
-        #     return
 
         soup = BeautifulSoup(self.content, 'lxml')  # ответ
         self.divs = soup.find_all(class_=self.soup_class)  # данные ответа
@@ -1164,13 +1165,12 @@ class ParserYandexWithSelenium(Parser):
 
     def start_pars(self, **kwargs):
         """ функция парсера.
-        :param **kwargs:
         """
         self.get_selenium_divs()
 
-        assert self.seleenium_divs is not None, str(calling_script()) + 'divs is None'
+        assert self.selenium_divs is not None, str(calling_script()) + 'divs is None'
 
-        for divs_number, item_divs in enumerate(self.seleenium_divs):
+        for divs_number, item_divs in enumerate(self.selenium_divs):
             l_message(calling_script(), f"\nСтраница номер: {divs_number + 1} \n", color=BColors.OKBLUE)
 
             self.get_content_from_file(file=item_divs)
@@ -1195,12 +1195,12 @@ class Webdriver:
         self.options = None
         self.content = None
 
-    def creat(self):
+    def create(self):
         """ Создание webdriver с опциями
         """
-        self.options = self.creat_options()
-        self.chrome_driver = self.creat_webdriver()
-        l_message(calling_script(), f'webdriver creat', color=BColors.OKBLUE)
+        self.options = self.create_options()
+        self.chrome_driver = self.create_webdriver()
+        l_message(calling_script(), f'webdriver create', color=BColors.OKBLUE)
 
     def set_config(self) -> None:
         """ Установление дополнительных опций работы webdriver
@@ -1211,7 +1211,7 @@ class Webdriver:
         # set page load timeout in seconds
         self.chrome_driver.set_page_load_timeout(15 + BROWSER_SPEED)
 
-    def creat_options(self):
+    def create_options(self):
         """ Создание опция для webdriver
         """
         self.options = webdriver.ChromeOptions()
@@ -1226,13 +1226,13 @@ class Webdriver:
 
         return self.options
 
-    def creat_webdriver(self):
+    def create_webdriver(self):
         """Создание webdriver
         """
         return webdriver.Chrome(ChromeDriverManager().install(), options=self.options)
 
     @staticmethod
-    def creat_folder():
+    def create_folder():
         """Создание папки для сохранеиения загруженных страниц
         """
         if not os.path.exists('page'):
@@ -1248,7 +1248,7 @@ class Webdriver:
         """Запись содержимого страницы
         :param number:
         """
-        self.creat_folder()
+        self.create_folder()
 
         file = 'page/' + str(number) + "_index_page.html"
 
@@ -1273,18 +1273,6 @@ class Webdriver:
         except Exception as err:
             l_message(calling_script(), f" Exception: {repr(err)}", color=BColors.FAIL)
             self.close_and_quit()
-
-    def get_content_from_file(self):
-        with open("index_selenium.html") as file:
-            self.content = file.read()
-        return self.content
-
-    # soup = BeautifulSoup(src, "lxml")
-    # hotels_cards = soup.find_all("div", class_="hotel_card_dv")
-    #
-    # for hotel_url in hotels_cards:
-    #     hotel_url = "https://www.tury.ru" + hotel_url.find("a").get("href")
-    #     print(hotel_url)
 
 
 # ---------------------------------- constructor url ----------------------------------
@@ -1318,17 +1306,7 @@ def url_constructor_yandex(queries_path, selected_base_url, selected_region, wit
     return urls
 
 
-def get_content_with_selenium(urls):
-    """
-    """
-    webdriver = Webdriver(proxy='')
-    webdriver.creat()
-
-    for number, url in enumerate(urls):
-        webdriver.get_content(number, url)
-        sleep(5)
-
-    webdriver.close_and_quit()
+PARSE_WITH_SELENIUM = False
 
 
 def main():
@@ -1339,9 +1317,10 @@ def main():
     urls = url_constructor_yandex(queries_path, base_url_yandex, region_yandex, within_time, num_doc,
                                   url_max_pos_yandex)
 
-    # parser_selenium = ParserYandexWithSelenium()
-    # parser_selenium.get_content_with_selenium(urls=urls)
-    # parser_selenium.start_pars()
+    if PARSE_WITH_SELENIUM:
+        parser_selenium = ParserYandexWithSelenium()
+        parser_selenium.get_content_with_selenium(urls=urls)
+        parser_selenium.start_pars()
 
     parser = ParserYandex()
     parser.start_pars(urls=urls)
