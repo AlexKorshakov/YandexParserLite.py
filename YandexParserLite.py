@@ -2,7 +2,6 @@
     Все файлы, зависимости, настройки и логика в одном файле.
     Специально для братика :)
 """
-from os import listdir
 
 """ Перед началом работ необходимо выполнить команду python -m pip install --upgrade pip для обновлния pip 
 """
@@ -13,12 +12,16 @@ from os import listdir
 # ---------------------------------- prepare / install / checking requirements ----------------------------------
 
 
+import asyncio
 import inspect
 import io
 import json
+import multiprocessing
 import os
 import subprocess
+import time
 from datetime import datetime
+from os import listdir
 from random import choice, randint, uniform
 from time import monotonic, sleep
 
@@ -96,6 +99,7 @@ try:
     from requests import Response
     from requests.adapters import HTTPAdapter
     from requests.exceptions import ConnectTimeout, ConnectionError, ProxyError
+    from requests.sessions import Session
 except ImportError:
     raise ImportError('для установки этой библиотеки введите команду pip install requests в терминале')
 
@@ -120,14 +124,20 @@ except ImportError:
     raise ImportError('для установки этой библиотеки введите команду pip install webdriver_manager в терминале')
 
 try:
+    from proxybroker import Broker
+except ImportError:
+    raise ImportError('для установки этой библиотеки введите команду pip install proxybroker в терминале')
+
+try:
     to_unicode = unicode
 except NameError:
     to_unicode = str
 
+
 # ---------------------------------- Setting ----------------------------------
 
-# включение отладки
-PASSED = False
+
+PASSED = False  # включение отладки
 
 __date__ = '28.03.2021'
 __author__ = 'kokkaina13@gmail.com (Alex Korshakov)'
@@ -683,7 +693,7 @@ class Parser:
         self.request = None
         self.session = None
 
-        self.proxyes: list = []  # создаем список c прокси
+        self.proxyes: list = self._load_proxies_list()  # создаем список c прокси
         self.full_path_to_file = None
         self.proxy_path = None
         self.request_timeout = None
@@ -758,7 +768,7 @@ class Parser:
                 self.request: Response = self.session.get(self.url, headers=header, stream=True,
                                                           timeout=self.request_timeout)
                 if self.check_request_status_code(self.request):
-                    l_message(calling_script(), 'Успешный запрос!', color=BColors.OKBLUE)
+                    l_message(calling_script(), f'Успешный запрос!', color=BColors.OKBLUE)
                     self.close_session()
                     return self.request
                 else:
@@ -935,6 +945,17 @@ class Parser:
         # открываем файл с ключами по пути path_to_queries и считываем ключи
         with open(self.proxy_path, 'r', encoding='utf-8') as file:
             return [x.strip() for x in file if x != ""]
+
+    def _load_proxies_list(self):
+        """ Добавляем проверенные прокси в proxies_list.
+        """
+        try:
+            with open(PROXIES_LIST, 'r') as file:
+                self.proxyes: list = file.read().split('\n')
+
+        except FileNotFoundError as err:
+            l_message(calling_script(), f"FileNotFoundError: {repr(err)}", color=BColors.FAIL)
+            self.proxyes = []
 
 
 # ---------------------------------- Parser class ----------------------------------
@@ -1277,22 +1298,28 @@ class Webdriver:
 
 # ---------------------------------- constructor url ----------------------------------
 
-def url_constructor_yandex(queries_path, selected_base_url, selected_region, within_time, num_doc=10, max_pos=3):
+def url_constructor_yandex(
+        url_queries_path,
+        selected_base_url,
+        selected_region,
+        url_within_time,
+        url_num_doc=10,
+        max_pos=3):
     """ Формирование запросов из запчастей.
     """
     urls = []
     # открываем файл с ключами по пути path_to_queries и считываем ключи
-    with open(queries_path, 'r', encoding='utf-8') as file:
+    with open(url_queries_path, 'r', encoding='utf-8') as file:
         query = [x.strip() for x in file if x != '']
 
     for ques in query:  # перебираем ключи и формируем url на их основе
         divs_ques: str = ques
-        if num_doc == 10:
+        if url_num_doc == 10:
             mod_url = selected_base_url + ques.replace(' ', '%20') + '&lr=' + str(selected_region) + '&within=' + str(
-                within_time) + '&lang=ru'
+                url_within_time) + '&lang=ru'
         else:
             mod_url = selected_base_url + ques.replace(' ', '%20') + '&lr=' + str(selected_region) + '&within=' + str(
-                within_time) + '&lang=ru' + '&num_doc=' + str(num_doc)
+                url_within_time) + '&lang=ru' + '&num_doc=' + str(url_num_doc)
 
         for i in range(max_pos):  # дополняем url и формируем для кажного запроса
             if i == 0:
@@ -1304,6 +1331,199 @@ def url_constructor_yandex(queries_path, selected_base_url, selected_region, wit
                     l_message(calling_script(), url, color=BColors.OKBLUE)
                     urls.append({'url': url, 'ques': divs_ques})  # остальные ссылки с ключом
     return urls
+
+
+PROXIES_LIST: str = str(current_dir) + r'\proxyeslist.txt'
+PROXIES: str = str(current_dir) + r'\proxies.txt'
+
+
+class ProxyMaker:
+
+    def __init__(self):
+        self.limit = 25
+        self.timeout = TIMEOUT
+        self.max_proxies = 25
+        self.max_run = 5
+
+    @staticmethod
+    async def _save_proxies(proxies, filename: str):
+        """ Сохраняем прокси от Broker в файл PROXIES
+            :param proxies: найденный Broker прокси: object
+            :param filename: полный путь к файлу для записи и хранения прокси: str
+        """
+        l_message(calling_script(), f'proxyes {proxies}', color=BColors.OKBLUE)
+        with open(filename, 'w') as file:
+            while True:
+                proxy = await proxies.get()
+                if proxy is None:
+                    break
+                proto = 'https' if 'HTTPS' in proxy.types else 'http'
+                row = f'{proto}://{proxy.host}:{proxy.port}\n'
+                file.write(row)
+
+    def _get_proxies(self):
+        """ Собираем прокси с помощью proxybroker
+            :return: proxies_list_get : список найденных прокси: list
+        """
+        loop = asyncio.get_event_loop()
+
+        proxies = asyncio.Queue()
+        broker = Broker(proxies, timeout=12, max_conn=200, max_tries=2, verify_ssl=False, loop=loop)
+        tasks = asyncio.gather(
+            broker.grab(countries=['RU'], limit=self.limit), self._save_proxies(proxies, filename=PROXIES)
+        )
+
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(tasks)
+
+        # записываем собранное в proxies_list_get
+        with open(PROXIES, 'r') as prx_row:
+            proxies_list_get = prx_row.read().split('\n')
+
+        l_message(calling_script(), f'proxies_list_get {str(proxies_list_get)}', color=BColors.OKBLUE)
+        return proxies_list_get
+
+    def _check_proxies(self, proxies_list: list):
+        """ Проверяем список прокси
+            :return: valid_proxies_list: возвращает список проверенных прокси: list
+            :param proxies_list: лист с прокси для проверки : list
+        """
+        l_message(calling_script(), f'proxies_list {str(proxies_list)}', color=BColors.OKBLUE)
+        mgr = multiprocessing.Manager()
+        valid_proxies_list: list = mgr.list()
+
+        n_chunks: int = 4
+        chunks = [proxies_list[i::n_chunks] for i in range(n_chunks)]
+
+        parcs_list: list = []
+        for chunk in chunks:
+            chunk_p = multiprocessing.Process(target=self._check_proxy, args=(chunk, valid_proxies_list))
+            parcs_list.append(chunk_p)
+            chunk_p.start()
+
+        for chunk_p in parcs_list:
+            chunk_p.join()
+
+        l_message(calling_script(), f'valid_proxies_list {str(valid_proxies_list)}', color=BColors.OKBLUE)
+
+        return valid_proxies_list
+
+    def _check_proxy(self, proxies_for_check, valid_proxies):
+        """ Проверяем каждый прокси
+            :param proxies_for_check: список прокси для проверки прокси : list
+            :param valid_proxies: список валидных прокси : list
+        """
+        session: Session = requests.Session()
+
+        for nu_proxy in proxies_for_check:
+            l_message(calling_script(), f'nu_proxy {str(nu_proxy)}', color=BColors.OKBLUE)
+            try:
+                # time_rand(2, 3)  # задержка исполнеия
+                request = session.get(HOST, headers=HEADERS_TEST, proxies={'http': nu_proxy, 'https': nu_proxy},
+                                      timeout=self.timeout)
+                l_message(calling_script(), f'request.status_code {str(request.status_code)}', color=BColors.OKBLUE)
+
+                if self._check_request_status_code(request=request, url=nu_proxy):
+                    valid_proxies.append(nu_proxy)
+                    l_message(calling_script(),
+                              f"valid_proxies {str(nu_proxy)} : {str(request.headers['Content-Type'])}",
+                              color=BColors.OKBLUE)
+                    session.close()
+                    return valid_proxies
+                else:
+                    session.close()
+
+            except ProxyError as err:
+                l_message(calling_script(), f"ProxyError: {repr(err)}", color=BColors.FAIL)
+                session.close()
+
+            except ConnectTimeout as err:
+                l_message(calling_script(), f"ConnectTimeout: {repr(err)}", color=BColors.FAIL)
+                session.close()
+
+            except AttributeError as err:
+                l_message(calling_script(), f"AttributeError: {repr(err)}", color=BColors.FAIL)
+                session.close()
+
+            except Exception as err:
+                l_message(calling_script(), f"Exception: {repr(err)}", color=BColors.FAIL)
+                session.close()
+
+    @staticmethod
+    def _check_request_status_code(request, url) -> bool:
+        """ Проверка кода ответа запроса.
+        """
+        if request.status_code == 200:  # если запрос был выполнен успешно то
+            l_message(calling_script(), 'Успешный запрос!', color=BColors.OKBLUE)
+            return True
+
+        elif request.status_code == 400:
+            l_message(calling_script(), f'BAD request {url} : {str(request.status_code)}', color=BColors.FAIL)
+            return False
+
+        elif 400 < request.status_code < 500:
+            l_message(calling_script(), f'Client Error {url} : {str(request.status_code)}', color=BColors.FAIL)
+            return False
+
+        elif 500 <= request.status_code < 600:
+            l_message(calling_script(), f'Server Error {url} : {str(request.status_code)}', color=BColors.FAIL)
+            return False
+
+        else:
+            l_message(calling_script(),
+                      f'Неудачный запрос! Ответ {str(request.status_code)} : {str(request.status_code)}',
+                      color=BColors.FAIL)
+            return False
+
+    @staticmethod
+    def _app_load_proxies_list(get_proxy: list):
+        """ Добавляем проверенные прокси в proxies_list.
+            :param get_proxy: добаляет список get_proxy в файл PROXIES_LIST: list
+        """
+        try:
+            # добавляем прокси к уже проверенным
+            with open(PROXIES_LIST, 'r') as file:
+                proxies_list: list = file.read().split('\n')
+
+        except FileNotFoundError as err:
+            l_message(calling_script(), f"FileNotFoundError: {repr(err)}", color=BColors.FAIL)
+            # если файл пустой - обнуляем список
+            proxies_list = []
+
+        if proxies_list:
+            get_proxy.extend(proxies_list)
+        # преобразуев множество чтобы удалить повторы и обратно в list
+        get_proxy = list(set(get_proxy))
+        l_message(calling_script(), f"{str(get_proxy)}", color=BColors.OKBLUE)
+
+        get_proxy = [x for x in get_proxy if x != ""]
+
+        with open(PROXIES_LIST, 'w') as file:
+            file.write('\n'.join(get_proxy))
+
+    @staticmethod
+    def _time_rand(t_start: int = 1, t_stop: int = 30):
+        """ Функция задержки выполнения кода на рандомный промежуток.
+        """
+        time_random = randint(t_start, t_stop)
+        l_message(calling_script(), f'Время ожидания нового запроса time_rand  {str(time_random)} sec',
+                  color=BColors.OKBLUE)
+
+        for _ in range(time_random):
+            time.sleep(uniform(0.8, 1.2))
+
+    def run(self):
+        """ Основная функция
+        """
+        l_message(calling_script(), '\n**** Start ****\n', color=BColors.OKBLUE)
+
+        for _ in range(self.max_run):
+            proxies_list = self._get_proxies()
+            proxy = self._check_proxies(proxies_list)
+            self._app_load_proxies_list(proxy)
+            self._time_rand(10, 15)
+
+        l_message(calling_script(), '\n**** Done ****\n', color=BColors.OKBLUE)
 
 
 PARSE_WITH_SELENIUM = False
@@ -1329,4 +1549,6 @@ def main():
 
 
 if __name__ == '__main__':
+
+    # ProxyMaker().run()
     main()
