@@ -1,7 +1,6 @@
-#!/usr/bin/env python3
 
-import setuptools
 import os
+import setuptools
 
 
 def _read_reqs(relpath):
@@ -10,8 +9,8 @@ def _read_reqs(relpath):
         relpath:
     """
     fullpath = os.path.join(os.path.dirname(__file__), relpath)
-    with open(fullpath) as f:
-        return [s.strip() for s in f.readlines()
+    with open(fullpath) as file:
+        return [s.strip() for s in file.readlines()
                 if (s.strip() and not s.startswith("#"))]
 
 
