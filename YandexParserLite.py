@@ -6,11 +6,7 @@
 """ Перед началом работ необходимо выполнить команду python -m pip install --upgrade pip для обновлния pip 
 """
 
-""" Перед началом работ необходимо выполнить команду pip3 install -r requirements.txt при наличии файла requirements.txt 
-"""
-
-# ---------------------------------- prepare / install / checking requirements ----------------------------------
-
+'Перед началом работ необходимо выполнить команду pip3 install -r requirements.txt при наличии файла requirements.txt '
 
 import asyncio
 import inspect
@@ -24,6 +20,7 @@ from datetime import datetime
 from os import listdir
 from random import choice, randint, uniform
 from time import monotonic, sleep
+from typing import Dict, List
 
 from idna import unicode
 
@@ -32,8 +29,8 @@ def checking_requirements_txt():
     """Проверка  файла requirements.txt
     """
     try:
-        with open(f'{"requirements.txt"}', 'r') as f:
-            requirements = f.read()
+        with open(f'{"requirements.txt"}', 'r') as file:
+            requirements = file.read()
     except FileNotFoundError:
         assert False, 'Проверьте, что добавили файл requirements.txt'
 
@@ -133,7 +130,6 @@ try:
 except NameError:
     to_unicode = str
 
-
 # ---------------------------------- Setting ----------------------------------
 
 
@@ -162,7 +158,7 @@ AGENTS = [
 ]
 
 # альтернативные заголовки запроса
-kad_head = {
+KAD_HEAD = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
     'Accept-Encoding': 'gzip, deflate',
     'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4',
@@ -190,7 +186,7 @@ HEADERS_TEST = {
 }
 
 # заголовки таблицы выгрузки
-headers_tab = {
+HEADERS_TAB = {
     'rowNom': 'п\п',  # i_row
     'ques': 'Ключ',  # url_ques
     'company_title': 'Заголовок',  # my_company_title
@@ -209,37 +205,37 @@ headers_tab = {
 RESPONSE_LIMIT: int = 150
 
 # текущая директория
-current_dir = str(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))))
+CURRENT_DIR = str(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))))
 
 # текущая дата
-date_today = datetime.today().strftime("%d.%m.%Y")
+DATE_TODAY = datetime.today().strftime("%d.%m.%Y")
 
 # полный путь к текущей директории
-full_path = current_dir + '\\'
+FULL_PATH = CURRENT_DIR + '\\'
 
 # базовое расширение файла выгрузки
-extension = '.xlsx'
+EXTENSION = '.xlsx'
 
 # задаём полный путь к файлу с выгрузкой
-report_name: str = 'Parser_Yandex.xlsx'
+REPORT_NAME: str = 'Parser_Yandex.xlsx'
 
 # полный путь к файлу с ключами
-queries_path: str = 'queries.txt'
+QUERIES_PATH: str = 'queries.txt'
 
 # полный путь к файлу с прокси
-proxy_path: str = 'proxieslist.txt'
+PROXY_PATH: str = 'proxieslist.txt'
 
 # ---------------------------------- URL Setting ----------------------------------
 
 # базовый запрос
-base_url_yandex: str = 'https://www.yandex.ru/search/ads?text='
+BASE_URL_YANDEX: str = 'https://www.yandex.ru/search/ads?text='
 
 # задаём максимальное кооличество запросов
-url_max_pos_yandex = 2
+URL_MAX_POS_YANDEX = 2
 
 # Задаём регион. Санкт-Петербург – 2. Краснодар  - 35
 # Список идентификаторов российских регионов https://tech.yandex.ru/xml/doc/dg/reference/regions-docpage/
-region_yandex: int = 35
+REGION_YANDEX: int = 35
 
 # период
 # 1 – последние две недели;
@@ -252,21 +248,21 @@ region_yandex: int = 35
 # 77 – сутки(24 часа, независимо от того, сколько длятся секущие сутки);
 # 8 – трое суток;
 # 9 – неделя
-within_time: int = 5
+WITHIN_TIME: int = 5
 
 # колличество ссылок в каждой выдаче
-num_doc: int = 10  # не рекомендуется менять от слова совсем
+NUM_DOC: int = 10  # не рекомендуется менять от слова совсем
 # – определяет количество документов (ссылок), отображаемых на одной странице результатов выдачи.
 #  по умолчанию = 10
 # колличество одновременных процессов / потоков
-max_process: int = 1
+MAX_PROCESS: int = 1
 
 # ---------------------------------- Pars Setting ----------------------------------
 
 
-soup_name = 'li'
-soup_class = 'serp-item'
-soup_attribute = 'text'
+SOUP_NAME: str = 'li'
+SOUP_CLASS: str = 'serp-item'
+SOUP_ATTRIBUTE: str = 'text'
 
 # ---------------------------------- LOG Setting ----------------------------------
 
@@ -274,7 +270,7 @@ soup_attribute = 'text'
 VIS_LOG = False  # True -  Отображение хода процесса в консоли
 PRINT_LOG = True  # True -  Запись лога в файл
 
-config = {'get_main_interval': 6,
+CONFIG = {'get_main_interval': 6,
           'get_reConnect_interval': 5,  # Time (seconds). Recommended value: 5
           'colors': True,  # True/False. True prints colorful msgs in console
           }
@@ -333,7 +329,7 @@ def decorate_msg(msg, color=None) -> str:
         msg, otherwise
     """
     msg_string = msg
-    if config['colors']:
+    if CONFIG['colors']:
         msg_string = color + msg + BColors.ENDC
     return msg_string
 
@@ -478,7 +474,7 @@ class WriterToXLSX:
     def insert_headers_divs_requests(self):
         """Создание заголовков в list с распарсенными данными.
         """
-        return self.divs_requests.insert(0, headers_tab)
+        return self.divs_requests.insert(0, HEADERS_TAB)
 
     @property
     def create_workbook(self):
@@ -693,14 +689,14 @@ class Parser:
         self.request = None
         self.session = None
 
-        self.proxyes: list = self._load_proxies_list()  # создаем список c прокси
+        self.proxyes: list = []  # создаем список c прокси
         self.full_path_to_file = None
-        self.proxy_path = None
+        self.get_proxy_path = None
         self.request_timeout = None
 
-        self.soup_name = None
-        self.soup_class = None
-        self.soup_attribute = None
+        self.get_soup_name = None
+        self.get_soup_class = None
+        self.get_soup_attribute = None
 
     def start_pars(self, urls):
         """ Определение начало работы в базовом классе.
@@ -719,7 +715,6 @@ class Parser:
                 if number <= RESPONSE_LIMIT:
                     self.get_response()
                 else:
-                    self.proxyes = self.get_proxy_pool_from_file()
                     self.get_response_with_proxy()
 
                 self.soup_request()  # обработка ответа сервера
@@ -842,7 +837,7 @@ class Parser:
                     continue
                 data_request.append({"headers": header,
                                      "proxy": {'http': proxy, 'https': proxy},
-                                     "TIMEOUT": self.request_timeout * 2,
+                                     "timeout": self.request_timeout * 2,
                                      "stream": True
                                      })
         yield data_request
@@ -876,7 +871,7 @@ class Parser:
         """ Обработка ответа с помощью BeautifulSoup. Если есть нужные данные - передаёт на поиск нужных данных в
             divs_text_shelves.
         """
-        if not hasattr(self.request, self.soup_attribute):
+        if not hasattr(self.request, self.get_soup_attribute):
             l_message(calling_script(), 'Ответ не содержит текст :(', color=BColors.FAIL)
             return
 
@@ -885,7 +880,7 @@ class Parser:
             return
 
         soup = BeautifulSoup(self.request.text, 'lxml')  # ответ
-        self.divs = soup.find_all(class_=self.soup_class)  # данные ответа
+        self.divs = soup.find_all(class_=self.get_soup_class)  # данные ответа
 
         if self.divs is None or len(self.divs) == 0:
             l_message(calling_script(), 'Ответ не содержит нужных данных :(', color=BColors.FAIL)
@@ -942,9 +937,12 @@ class Parser:
     def get_proxy_pool_from_file(self):
         """Создаём пул прокси.
         """
-        # открываем файл с ключами по пути path_to_queries и считываем ключи
-        with open(self.proxy_path, 'r', encoding='utf-8') as file:
-            return [x.strip() for x in file if x != ""]
+        try:
+            with open(self.get_proxy_path, 'r', encoding='utf-8') as file:
+                return [x.strip() for x in file if x != ""]
+        except FileNotFoundError as err:
+            l_message(calling_script(), f"FileNotFoundError: {repr(err)}", color=BColors.FAIL)
+            return []
 
     def _load_proxies_list(self):
         """ Добавляем проверенные прокси в proxies_list.
@@ -964,20 +962,28 @@ class Parser:
 class ParserYandex(Parser):
     """ Класс парсера Яндекса наследуется от базового парсера.
     """
+    headers: List[Dict[str, str]]
+    full_path_to_file: str
+    FULL_PATH: str
+    PROXY_PATH: str
+    request_timeout: float
+    SOUP_NAME: str
+    SOUP_CLASS: str
+    SOUP_ATTRIBUTE: str
 
     def __init__(self, ):
         super(ParserYandex, self).__init__(self)
 
-        self.headers = [HEADERS_TEST, kad_head]
-        self.full_path_to_file = full_path
-        self.proxy_path = proxy_path
+        self.headers = [HEADERS_TEST, KAD_HEAD]
+        self.full_path_to_file = FULL_PATH
+        self.get_proxy_path = PROXY_PATH
         self.request_timeout = REQUEST_TIMEOUT
 
-        self.full_path = full_path + PARSER_NAME + ' ' + date_today + extension
+        self.get_full_path = FULL_PATH + PARSER_NAME + ' ' + DATE_TODAY + EXTENSION
 
-        self.soup_name = soup_name
-        self.soup_class = soup_class
-        self.soup_attribute = soup_attribute
+        self.get_soup_name = SOUP_NAME
+        self.get_soup_class = SOUP_CLASS
+        self.get_soup_attribute = SOUP_ATTRIBUTE
 
     def start_pars(self, urls):
         """ функция парсера.
@@ -1047,12 +1053,8 @@ class ParserYandex(Parser):
             my_company_url: str = info.get_my_company_url()
 
             if my_company_title == 'N/A' and \
-                    my_company_cid == 'N/A' and \
                     my_company_link_1 == 'N/A' and \
-                    my_company_site_fast_links == 'N/A' and \
-                    my_company_text == 'N/A' and \
-                    my_company_contact == 'N/A' and \
-                    my_company_url == 'N/A':
+                    my_company_text == 'N/A':
                 return
 
             self.divs_requests.append(
@@ -1077,7 +1079,7 @@ class ParserYandex(Parser):
         if WRITE_TO_JSON:
             write_json_file(data=self.divs_requests, name="divs")
 
-        file_writer = WriterToXLSX(self.divs_requests, self.full_path)
+        file_writer = WriterToXLSX(self.divs_requests, self.get_full_path)
         file_writer.file_writer()
 
 
@@ -1090,10 +1092,10 @@ class ParserYandexWithSelenium(Parser):
 
         self.divs = None
         self.content = None
-        self.full_path = full_path + PARSER_NAME + ' ' + date_today + extension
+        self.full_path = FULL_PATH + PARSER_NAME + ' ' + DATE_TODAY + EXTENSION
         self.fold_path = "\\page"
         self.selenium_divs = []
-        self.soup_attribute = soup_attribute
+        self.soup_attribute = SOUP_ATTRIBUTE
 
     def write_data_to_file(self):
         """ Запись данных в файл.
@@ -1155,19 +1157,19 @@ class ParserYandexWithSelenium(Parser):
             )
             i_row = i_row + 1
 
-    def get_content_from_file(self, file):
+    def get_content_from_file(self, content_file):
         """Получение данных из файйла .html
-        :param file:
+        :param content_file:
         :return:
         """
-        with open(current_dir + self.fold_path + "\\" + file, encoding='utf-8') as file:
+        with open(CURRENT_DIR + self.fold_path + "\\" + content_file, encoding='utf-8') as file:
             self.content = file.read()
         return self.content
 
-    def get_selenium_divs(self):
+    def get_selenium_divs(self) -> object:
         """Поиск файлов в папке fold_path
         """
-        for filename in listdir(current_dir + self.fold_path):
+        for filename in listdir(CURRENT_DIR + self.fold_path):
             self.selenium_divs.append(filename)
 
     def soup_request(self):
@@ -1176,7 +1178,7 @@ class ParserYandexWithSelenium(Parser):
         """
 
         soup = BeautifulSoup(self.content, 'lxml')  # ответ
-        self.divs = soup.find_all(class_=self.soup_class)  # данные ответа
+        self.divs = soup.find_all(class_=self.get_soup_class)  # данные ответа
 
         if self.divs is None or len(self.divs) == 0:
             l_message(calling_script(), 'Ответ не содержит нужных данных :(', color=BColors.FAIL)
@@ -1184,7 +1186,7 @@ class ParserYandexWithSelenium(Parser):
 
         l_message(calling_script(), f'Всего найдено блоков {str(len(self.divs))}', color=BColors.OKBLUE)
 
-    def start_pars(self, **kwargs):
+    def start_pars(self, **kvargs):
         """ функция парсера.
         """
         self.get_selenium_divs()
@@ -1194,7 +1196,7 @@ class ParserYandexWithSelenium(Parser):
         for divs_number, item_divs in enumerate(self.selenium_divs):
             l_message(calling_script(), f"\nСтраница номер: {divs_number + 1} \n", color=BColors.OKBLUE)
 
-            self.get_content_from_file(file=item_divs)
+            self.get_content_from_file(content_file=item_divs)
 
             self.soup_request()
             self.divs_text_shelves()
@@ -1217,11 +1219,11 @@ class Webdriver:
         self.content = None
 
     def create(self):
-        """ Создание webdriver с опциями
+        """Создание webdriver с опциями
         """
         self.options = self.create_options()
         self.chrome_driver = self.create_webdriver()
-        l_message(calling_script(), f'webdriver create', color=BColors.OKBLUE)
+        l_message(calling_script(), 'webdriver create', color=BColors.OKBLUE)
 
     def set_config(self) -> None:
         """ Установление дополнительных опций работы webdriver
@@ -1298,28 +1300,29 @@ class Webdriver:
 
 # ---------------------------------- constructor url ----------------------------------
 
-def url_constructor_yandex(
-        url_queries_path,
-        selected_base_url,
-        selected_region,
-        url_within_time,
-        url_num_doc=10,
-        max_pos=3):
+def url_constructor_yandex():
     """ Формирование запросов из запчастей.
     """
+    queries_path = QUERIES_PATH
+    selected_base_url = BASE_URL_YANDEX
+    selected_region = REGION_YANDEX
+    within_time = WITHIN_TIME
+    num_doc = NUM_DOC
+    max_pos = URL_MAX_POS_YANDEX
+
     urls = []
     # открываем файл с ключами по пути path_to_queries и считываем ключи
-    with open(url_queries_path, 'r', encoding='utf-8') as file:
+    with open(queries_path, 'r', encoding='utf-8') as file:
         query = [x.strip() for x in file if x != '']
 
     for ques in query:  # перебираем ключи и формируем url на их основе
         divs_ques: str = ques
-        if url_num_doc == 10:
+        if num_doc == 10:
             mod_url = selected_base_url + ques.replace(' ', '%20') + '&lr=' + str(selected_region) + '&within=' + str(
-                url_within_time) + '&lang=ru'
+                within_time) + '&lang=ru'
         else:
             mod_url = selected_base_url + ques.replace(' ', '%20') + '&lr=' + str(selected_region) + '&within=' + str(
-                url_within_time) + '&lang=ru' + '&num_doc=' + str(url_num_doc)
+                within_time) + '&lang=ru' + '&num_doc=' + str(num_doc)
 
         for i in range(max_pos):  # дополняем url и формируем для кажного запроса
             if i == 0:
@@ -1333,8 +1336,8 @@ def url_constructor_yandex(
     return urls
 
 
-PROXIES_LIST: str = str(current_dir) + r'\proxyeslist.txt'
-PROXIES: str = str(current_dir) + r'\proxies.txt'
+PROXIES_LIST: str = str(CURRENT_DIR) + r'\proxyeslist.txt'
+PROXIES: str = str(CURRENT_DIR) + r'\proxies.txt'
 
 
 class ProxyMaker:
@@ -1344,6 +1347,8 @@ class ProxyMaker:
         self.timeout = TIMEOUT
         self.max_proxies = 25
         self.max_run = 5
+        self.proxyes: list = []
+        self.valid_proxies_list: list = []
 
     @staticmethod
     async def _save_proxies(proxies, filename: str):
@@ -1476,6 +1481,22 @@ class ProxyMaker:
             return False
 
     @staticmethod
+    def _write_proxies_list(get_proxy: list):
+        """ Добавляем проверенные прокси в proxies_list.
+            :param get_proxy: добаляет список get_proxy в файл PROXIES_LIST: list
+        """
+        try:
+            with open(PROXIES_LIST, 'w') as file:
+                for item in get_proxy:
+                    file.write(f"{item}\n")
+
+        except FileNotFoundError as err:
+            l_message(calling_script(), f"FileNotFoundError: {repr(err)}", color=BColors.FAIL)
+
+        except TypeError as err:
+            l_message(calling_script(), f"TypeError: {repr(err)}", color=BColors.FAIL)
+
+    @staticmethod
     def _app_load_proxies_list(get_proxy: list):
         """ Добавляем проверенные прокси в proxies_list.
             :param get_proxy: добаляет список get_proxy в файл PROXIES_LIST: list
@@ -1485,7 +1506,7 @@ class ProxyMaker:
             with open(PROXIES_LIST, 'r') as file:
                 proxies_list: list = file.read().split('\n')
 
-        except FileNotFoundError as err:
+        except Exception as err:
             l_message(calling_script(), f"FileNotFoundError: {repr(err)}", color=BColors.FAIL)
             # если файл пустой - обнуляем список
             proxies_list = []
@@ -1512,10 +1533,27 @@ class ProxyMaker:
         for _ in range(time_random):
             time.sleep(uniform(0.8, 1.2))
 
+    def _load_proxies_list(self):
+        """ Добавляем проверенные прокси в proxies_list.
+        """
+        try:
+            with open(PROXIES_LIST, 'r') as file:
+                self.proxyes: list = file.read().split('\n')
+
+        except FileNotFoundError as err:
+            l_message(calling_script(), f"FileNotFoundError: {repr(err)}", color=BColors.FAIL)
+            self.proxyes = []
+
     def run(self):
         """ Основная функция
         """
         l_message(calling_script(), '\n**** Start ****\n', color=BColors.OKBLUE)
+
+        self._load_proxies_list()
+        if self.proxyes != ['']:
+            self.valid_proxies_list = self._check_proxies(proxies_list=self.proxyes)
+        if self.valid_proxies_list:
+            self._write_proxies_list(self.valid_proxies_list)
 
         for _ in range(self.max_run):
             proxies_list = self._get_proxies()
@@ -1534,8 +1572,7 @@ def main():
     """
     l_message(calling_script(), '\n**** Start ****\n', color=BColors.OKBLUE)
 
-    urls = url_constructor_yandex(queries_path, base_url_yandex, region_yandex, within_time, num_doc,
-                                  url_max_pos_yandex)
+    urls = url_constructor_yandex()
 
     if PARSE_WITH_SELENIUM:
         parser_selenium = ParserYandexWithSelenium()
@@ -1549,6 +1586,5 @@ def main():
 
 
 if __name__ == '__main__':
-
-    # ProxyMaker().run()
-    main()
+    ProxyMaker().run()
+    # main()
