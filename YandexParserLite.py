@@ -45,7 +45,7 @@ def checking_requirements_txt():
 checking_requirements_txt()
 
 
-def _read_requirements(realpath):
+def _read_requirements(realpath: str = 'requirements.txt'):
     """ Чтение зависимостей из файла requirements.txt
         requirements.txt должен находится в тойже директории / папке с этим файлом
     """
@@ -55,7 +55,7 @@ def _read_requirements(realpath):
                 if (s.strip() and not s.startswith("#"))]
 
 
-_REQUIREMENTS_TXT = _read_requirements("requirements.txt")
+_REQUIREMENTS_TXT = _read_requirements(realpath="requirements.txt")
 INSTALL_REQUIRES = [line for line in _REQUIREMENTS_TXT if "://" not in line]
 
 
@@ -135,16 +135,16 @@ except NameError:
 
 PASSED = False  # включение отладки
 
-__date__ = '28.03.2021'
+__date__ = '16.05.2021'
 __author__ = 'kokkaina13@gmail.com (Alex Korshakov)'
 PARSER_NAME: str = 'ParserYandexSimplified'
 print(f'Invoking __init__.py for {__name__}')
 
 # время ожидания
-TIMEOUT = 180
+TIMEOUT: int = 180
 
 # максимальное кооличество прокси
-MAX_PROXYES = 25
+MAX_PROXYES: int = 25
 
 # время ожидания между отправкой повторного запроса
 REQUEST_TIMEOUT = 10.24
@@ -202,7 +202,7 @@ HEADERS_TAB = {
 
 
 # лимит на колличество запросов с одного ip
-RESPONSE_LIMIT: int = 150
+RESPONSE_LIMIT: int = 300
 
 # текущая директория
 CURRENT_DIR = str(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))))
@@ -216,9 +216,6 @@ FULL_PATH = CURRENT_DIR + '\\'
 # базовое расширение файла выгрузки
 EXTENSION = '.xlsx'
 
-# задаём полный путь к файлу с выгрузкой
-REPORT_NAME: str = 'Parser_Yandex.xlsx'
-
 # полный путь к файлу с ключами
 QUERIES_PATH: str = 'queries.txt'
 
@@ -231,7 +228,7 @@ PROXY_PATH: str = 'proxieslist.txt'
 BASE_URL_YANDEX: str = 'https://www.yandex.ru/search/ads?text='
 
 # задаём максимальное кооличество запросов
-URL_MAX_POS_YANDEX = 2
+URL_MAX_POS_YANDEX = 1
 
 # Задаём регион. Санкт-Петербург – 2. Краснодар  - 35
 # Список идентификаторов российских регионов https://tech.yandex.ru/xml/doc/dg/reference/regions-docpage/
@@ -275,8 +272,6 @@ CONFIG = {'get_main_interval': 6,
           'colors': True,  # True/False. True prints colorful msgs in console
           }
 
-NOW = str(datetime.now().strftime("%d.%m.%Y %H.%M.%S")) + " :: "
-
 WRITE_TO_JSON = True
 
 # ---------------------------------- browser setting ----------------------------------
@@ -288,7 +283,7 @@ BROWSER_SPEED: int = 1
 # ---------------------------------- service functions ----------------------------------
 
 
-def write_json_file(*, data=None, name=""):
+def write_json_file(*, data: object = None, name: str = "") -> None:
     """Запись данных в json
     """
     try:
@@ -306,9 +301,12 @@ def write_json_file(*, data=None, name=""):
 def read_json_file(file) -> list:
     """Чтение данных из json
     """
-    with open(file, 'r', encoding='utf8') as data_file:
-        data_loaded = json.load(data_file)
-    return data_loaded
+    try:
+        with open(file + ".json", 'r', encoding='utf8') as data_file:
+            data_loaded = json.load(data_file)
+        return data_loaded
+    except FileNotFoundError as err:
+        l_message(calling_script(), f" FileNotFoundError: {repr(err)}", color=BColors.FAIL)
 
 
 class BColors:  # colors in console
@@ -340,6 +338,7 @@ def write_to_console(*, param_name: str = None, p_value=None):
     try:
         if param_name == 'NLine':
             print('=' * 100)
+        NOW = str(datetime.now().strftime("%d.%m.%Y %H.%M.%S")) + " :: "
         try:
             if len(p_value) < 100:
                 print(NOW + f'Параметр {param_name} Значение: {p_value}')
@@ -357,8 +356,9 @@ def write_to_console(*, param_name: str = None, p_value=None):
 def write_to_text_log(*, param_name: str = None, p_value=None, d_path=None):
     """ Запись в логфайл.
     """
+    NOW = str(datetime.now().strftime("%d.%m.%Y %H.%M.%S")) + " :: "
     try:
-        with open(d_path + r'_Log.txt', 'a', encoding='utf-8') as file:
+        with open(DATE_TODAY + ' ' + d_path + r'_Log.txt', 'a', encoding='utf-8') as file:
             text = NOW + f'Параметр *** {param_name} *** Значение : {p_value}'
             file.write(text + '\n')
 
@@ -452,7 +452,7 @@ class WriterToXLSX:
         """
         l_message(calling_script(), 'Начало записи данных в файл', color=BColors.OKBLUE)
         doc_row: int = 1
-        for divs_iter in self.divs_requests:  # записываем данные
+        for divs_iter in tqdm(self.divs_requests):  # записываем данные
 
             if doc_row == 1:
                 self.wbook.Worksheets.Item(1).Cells(doc_row, 1).Value = divs_iter['rowNom']
@@ -698,7 +698,9 @@ class Parser:
         self.get_soup_class = None
         self.get_soup_attribute = None
 
-    def start_pars(self, urls):
+        self.proxy_maker = ProxyMaker()
+
+    def start_pars(self, urls: object) -> object:
         """ Определение начало работы в базовом классе.
         """
         assert self.urls is not None, f"{calling_script()} urls not passed"
@@ -780,6 +782,11 @@ class Parser:
         time_start = None
 
         self.proxyes = self.get_proxy_pool_from_file()
+
+        if not self.proxyes:
+            self.proxy_maker.run()
+            self.proxyes = self.get_proxy_pool_from_file()
+
         assert self.proxyes is not None, "proxyes not set"
 
         data_requests = self._create_data_request()
@@ -931,8 +938,12 @@ class Parser:
     def check_ip():
         """Check my public IP via tor.
         """
-        l_message(calling_script(), f'My public IP {requests.get("http://www.icanha4zip.com").text[:-2]}',
-                  color=BColors.OKBLUE)
+        try:
+            l_message(calling_script(), f'My public IP {requests.get("http://www.icanha4zip.com").text[:-2]}',
+                      color=BColors.OKBLUE)
+        except requests.exceptions.ConnectionError:
+            l_message(calling_script(), 'не удалось проверить IP',
+                      color=BColors.OKBLUE)
 
     def get_proxy_pool_from_file(self):
         """Создаём пул прокси.
@@ -979,7 +990,7 @@ class ParserYandex(Parser):
         self.get_proxy_path = PROXY_PATH
         self.request_timeout = REQUEST_TIMEOUT
 
-        self.get_full_path = FULL_PATH + PARSER_NAME + ' ' + DATE_TODAY + EXTENSION
+        self.get_full_path = FULL_PATH + PARSER_NAME + ' ' + self.date_today() + EXTENSION
 
         self.get_soup_name = SOUP_NAME
         self.get_soup_class = SOUP_CLASS
@@ -1002,7 +1013,6 @@ class ParserYandex(Parser):
                 if response_number <= RESPONSE_LIMIT:
                     self.get_response()
                 else:
-                    self.proxyes = self.get_proxy_pool_from_file()
                     self.get_response_with_proxy()
 
                 self.soup_request()  # обработка ответа сервера
@@ -1072,12 +1082,14 @@ class ParserYandex(Parser):
             )
             i_row = i_row + 1
 
-    def write_data_to_file(self):
-        """ Запись данных в файл.
-        """
+            if WRITE_TO_JSON:
+                write_json_file(data=self.divs_requests, name=PARSER_NAME + "_divs")
 
-        if WRITE_TO_JSON:
-            write_json_file(data=self.divs_requests, name="divs")
+    def write_data_to_file(self, readjsonfile=False):
+        """ Запись данных в файл .XLSX
+        """
+        if readjsonfile:
+            self.divs_requests = read_json_file(PARSER_NAME + "_divs")
 
         file_writer = WriterToXLSX(self.divs_requests, self.get_full_path)
         file_writer.file_writer()
@@ -1092,7 +1104,7 @@ class ParserYandexWithSelenium(Parser):
 
         self.divs = None
         self.content = None
-        self.full_path = FULL_PATH + PARSER_NAME + ' ' + DATE_TODAY + EXTENSION
+        self.get_full_path = FULL_PATH + PARSER_NAME + ' ' + self.date_today() + EXTENSION
         self.fold_path = "\\page"
         self.selenium_divs = []
         self.soup_attribute = SOUP_ATTRIBUTE
@@ -1241,7 +1253,10 @@ class Webdriver:
         self.options.add_argument("window-size=1366,768")
         self.options.add_argument("--disable-blink-features=AutomationControlled")
         self.options.add_argument("no-sandbox")
+        self.options.add_argument('--disable-gpu')
         self.options.add_argument("headless")
+        self.options.add_argument('--disable-extensions')
+        self.options.add_argument('--ignore-certificate-errors')
         self.options.add_argument(f"user-agent={AGENTS}")
 
         if self.proxy != "":
@@ -1345,7 +1360,7 @@ class ProxyMaker:
     def __init__(self):
         self.limit = 25
         self.timeout = TIMEOUT
-        self.max_proxies = 25
+        self.max_proxies = MAX_PROXYES
         self.max_run = 5
         self.proxyes: list = []
         self.valid_proxies_list: list = []
@@ -1397,7 +1412,11 @@ class ProxyMaker:
         mgr = multiprocessing.Manager()
         valid_proxies_list: list = mgr.list()
 
-        n_chunks: int = 4
+        if len(proxies_list) < 4:
+            n_chunks = len(proxies_list)
+        else:
+            n_chunks: int = 4
+
         chunks = [proxies_list[i::n_chunks] for i in range(n_chunks)]
 
         parcs_list: list = []
@@ -1523,7 +1542,54 @@ class ProxyMaker:
             file.write('\n'.join(get_proxy))
 
     @staticmethod
-    def _time_rand(t_start: int = 1, t_stop: int = 30):
+    def _clear_empty_proxy(list_proxy):
+        return [x for x in list_proxy if x != ""]
+
+    def _load_proxies_list(self):
+        """ Добавляем проверенные прокси в proxies_list.
+        """
+        try:
+            with open(PROXIES_LIST, 'r') as file:
+                self.proxyes: list = file.read().split('\n')
+                self.proxyes = self._clear_empty_proxy(self.proxyes)
+
+        except FileNotFoundError as err:
+            l_message(calling_script(), f"FileNotFoundError: {repr(err)}", color=BColors.FAIL)
+            self.proxyes = []
+
+    def _check_proxies_before_run(self):
+
+        self._load_proxies_list()
+        if self.proxyes != ['']:
+            self.valid_proxies_list = self._check_proxies(proxies_list=self.proxyes)
+            self.valid_proxies_list = self._clear_empty_proxy(self.valid_proxies_list)
+
+        if not self.valid_proxies_list:
+            os.remove(PROXIES_LIST)
+
+        self._write_proxies_list(self.valid_proxies_list)
+
+        self.proxyes = self.valid_proxies_list
+
+    def run(self):
+        """ Основная функция
+        """
+        l_message(calling_script(), '\n**** Start ****\n', color=BColors.OKBLUE)
+
+        self._check_proxies_before_run()
+
+        while not len(self.proxyes) >= self.max_run * MAX_PROCESS:
+            proxies_list = self._get_proxies()
+            proxy = self._check_proxies(proxies_list)
+            self._app_load_proxies_list(proxy)
+            self.proxyes = self._clear_empty_proxy(self.proxyes)
+            self._load_proxies_list()
+            # self._time_rand(10, 15)
+
+        l_message(calling_script(), '\n**** Done ****\n', color=BColors.OKBLUE)
+
+    @staticmethod
+    def _time_rand(t_start, t_stop):
         """ Функция задержки выполнения кода на рандомный промежуток.
         """
         time_random = randint(t_start, t_stop)
@@ -1533,38 +1599,15 @@ class ProxyMaker:
         for _ in range(time_random):
             time.sleep(uniform(0.8, 1.2))
 
-    def _load_proxies_list(self):
-        """ Добавляем проверенные прокси в proxies_list.
-        """
-        try:
-            with open(PROXIES_LIST, 'r') as file:
-                self.proxyes: list = file.read().split('\n')
 
-        except FileNotFoundError as err:
-            l_message(calling_script(), f"FileNotFoundError: {repr(err)}", color=BColors.FAIL)
-            self.proxyes = []
-
-    def run(self):
-        """ Основная функция
-        """
-        l_message(calling_script(), '\n**** Start ****\n', color=BColors.OKBLUE)
-
-        self._load_proxies_list()
-        if self.proxyes != ['']:
-            self.valid_proxies_list = self._check_proxies(proxies_list=self.proxyes)
-        if self.valid_proxies_list:
-            self._write_proxies_list(self.valid_proxies_list)
-
-        for _ in range(self.max_run):
-            proxies_list = self._get_proxies()
-            proxy = self._check_proxies(proxies_list)
-            self._app_load_proxies_list(proxy)
-            self._time_rand(10, 15)
-
-        l_message(calling_script(), '\n**** Done ****\n', color=BColors.OKBLUE)
-
-
+#  парсинг с использованием SELENIUM
 PARSE_WITH_SELENIUM = False
+
+# Если надо остановить процесс а потом записать всё что насобиралось
+# то меняем WRITE_DATA_FROM_FILE  с False на  True
+# тогда записываются все собранные данные
+# *  не забываем вернуть обратно
+WRITE_DATA_FROM_FILE = False
 
 
 def main():
@@ -1572,9 +1615,17 @@ def main():
     """
     l_message(calling_script(), '\n**** Start ****\n', color=BColors.OKBLUE)
 
+    if WRITE_DATA_FROM_FILE:
+        l_message(calling_script(), 'Выбрана запись из файла .json', color=BColors.OKBLUE)
+        parser = ParserYandex()
+        parser.write_data_to_file(readjsonfile=True)
+        l_message(calling_script(), '\n**** Done ****\n', color=BColors.OKBLUE)
+        return
+
     urls = url_constructor_yandex()
 
     if PARSE_WITH_SELENIUM:
+        l_message(calling_script(), 'Выбрано ParserYandexWithSelenium', color=BColors.OKBLUE)
         parser_selenium = ParserYandexWithSelenium()
         parser_selenium.get_content_with_selenium(urls=urls)
         parser_selenium.start_pars()
@@ -1586,5 +1637,5 @@ def main():
 
 
 if __name__ == '__main__':
-    ProxyMaker().run()
-    # main()
+    # ProxyMaker().run()
+    main()
