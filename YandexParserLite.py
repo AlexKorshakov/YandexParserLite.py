@@ -229,7 +229,7 @@ PROXY_PATH: str = 'proxieslist.txt'
 # базовый запрос
 BASE_URL_YANDEX: str = 'https://www.yandex.ru/search/ads?text='
 
-# задаём максимальное кооличество запросов
+# задаём максимальное кооличество запросов на один url
 URL_MAX_POS_YANDEX = 1
 
 # Задаём регион. Санкт-Петербург – 2. Краснодар  - 35
@@ -514,17 +514,25 @@ class WriterToXLSX:
     def excel_app_start(self):
         """ Старт приложения Excel
         """
-        self.excel_app.DisplayAlerts = False  # отключаем обновление экрана
-        self.excel_app.Visible = False
-        self.excel_app.ScreenUpdating = False
+        try:
+            self.excel_app.DisplayAlerts = False  # отключаем обновление экрана
+            self.excel_app.Visible = False
+            self.excel_app.ScreenUpdating = False
+        except AttributeError as err:
+            l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
+            quit()
 
     def excel_app_quit(self):
         """Выход из приложения Excel
         """
-        self.excel_app.DisplayAlerts = True  # отключаем обновление экрана
-        self.excel_app.Visible = True
-        self.excel_app.ScreenUpdating = True
-        self.excel_app.Quit()
+        try:
+            self.excel_app.DisplayAlerts = True  # отключаем обновление экрана
+            self.excel_app.Visible = True
+            self.excel_app.ScreenUpdating = True
+            self.excel_app.Quit()
+        except AttributeError as err:
+            l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
+            quit()
 
 
 class InfoGetter:
@@ -534,7 +542,7 @@ class InfoGetter:
     def __init__(self, div):
         self.div = div
 
-    def get_my_company_title(self):
+    def get_my_company_title(self) -> str:
         """Найти и вернуть название компании.
         """
         try:
@@ -548,7 +556,7 @@ class InfoGetter:
 
         return my_company_title
 
-    def get_my_company_cid(self):
+    def get_my_company_cid(self) -> str:
         """Найти и вернуть порядковый номер компании на странице.
         """
         try:
@@ -561,7 +569,7 @@ class InfoGetter:
 
         return my_company_cid
 
-    def get_my_company_contact(self):
+    def get_my_company_contact(self) -> str:
         """Найти и вернуть контакты компании.
         """
         try:
@@ -582,7 +590,7 @@ class InfoGetter:
 
         return my_company_contact
 
-    def get_my_company_text(self):
+    def get_my_company_text(self) -> str:
         """Найти и вернуть описание компании.
         """
         try:
@@ -596,7 +604,7 @@ class InfoGetter:
 
         return my_company_text
 
-    def get_my_company_fast_links(self):
+    def get_my_company_fast_links(self) -> str:
         """Найти и вернуть ссылку на сайт компании.
         """
         try:
@@ -623,38 +631,32 @@ class InfoGetter:
 
         return link_string
 
-    def get_my_company_link_1(self):
+    def get_my_company_link_1(self) -> str:
         """Найти и вернуть ссылку на сайт компании.
         """
-        try:
-            my_company_link_1: str = self.div.find('a', attrs={
-                'class': 'Link Link_theme_outer Path-Item link path__item'}).find('b').text
+        my_company_link_1 = None
+        attrs_classes = [
+            'link link_theme_outer path__item click i-bem',
+            'Link Link_theme_outer Path-Item link path__item',
+            'link link_theme_outer path__item i-bem link_js_inited',
+            'link link_theme_outer path__item i-bem',
+        ]
 
-            if my_company_link_1 is None:
-                my_company_link_1: str = self.div.find('a', attrs={
-                    'class': 'link link_theme_outer path__item click i-bem'}).find('b').text
-
-            if my_company_link_1 is None:
-                my_company_link_1: str = 'N/A'
-
-            l_message(calling_script(), f'company_link_1 {my_company_link_1}', color=BColors.OKBLUE)
-
-        except AttributeError:
+        for item_class in attrs_classes:
             try:
-                my_company_link_1: str = self.div.find('a', attrs={
-                    'class': 'link link_theme_outer path__item i-bem'}).find('b').text
+                my_company_link_1 = self.div.find('a', attrs={'class': item_class})
+                if my_company_link_1 is not None:
+                    link_text = my_company_link_1.find('b').text
+                    l_message(calling_script(), f'company_link_1 {link_text}', color=BColors.OKBLUE)
+                    return link_text
+            except AttributeError:
+                l_message(calling_script(), f'company_link_1 {my_company_link_1}', color=BColors.FAIL)
+                continue
 
-            except AttributeError as err:
-                l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
-                my_company_link_1: str = 'N/A'
-
-
-        if my_company_link_1== 'N/A':
-            breakpoint()
-
+        my_company_link_1: str = 'N/A'
         return my_company_link_1
 
-    def get_my_company_url(self):
+    def get_my_company_url(self) -> str:
         """Найти и вернуть быструю ссылку на сайт компании.
         """
         try:
@@ -1095,7 +1097,7 @@ class ParserYandex(Parser):
         """
         return self.divs_requests.insert(0, HEADERS_TAB)
 
-    def write_data_to_file(self, readjsonfile=False):
+    def write_data_to_file(self, readjsonfile=False) -> None:
         """ Запись данных в файл .XLSX
         """
         if readjsonfile:
@@ -1107,7 +1109,11 @@ class ParserYandex(Parser):
 
         self._recording_with_pypiwin32()
 
-    def _recording_with_pandas(self):
+    def _recording_with_pandas(self) -> None:
+        """
+
+        :return: None
+        """
         try:
             df = pd.DataFrame(self.divs_requests)
             df.to_excel(f'./DataFrame {PARSER_NAME} {self.date_today()}.xlsx',
@@ -1119,7 +1125,11 @@ class ParserYandex(Parser):
         except Exception as err:
             l_message(calling_script(), f" Exception: {repr(err)}", color=BColors.FAIL)
 
-    def _recording_with_pypiwin32(self):
+    def _recording_with_pypiwin32(self) -> None:
+        """
+
+        :return: None
+        """
         file_writer = WriterToXLSX(self.divs_requests, self.get_full_path)
         file_writer.file_writer()
 
@@ -1660,7 +1670,7 @@ PARSE_WITH_SELENIUM = False
 # то меняем WRITE_DATA_FROM_FILE  с False на  True
 # тогда записываются все собранные данные
 # *  не забываем вернуть обратно
-WRITE_DATA_FROM_FILE = True
+WRITE_DATA_FROM_FILE = False
 
 
 def main():
