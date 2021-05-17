@@ -9,6 +9,7 @@ requests==2.25.1
 soupsieve==2.2
 tqdm==4.59.0
 urllib3==1.26.4
+pandas==1.2.4
 
 setuptools~=50.3.0
 selenium~=3.141.0

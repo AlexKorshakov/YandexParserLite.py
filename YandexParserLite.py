@@ -22,6 +22,7 @@ from random import choice, randint, uniform
 from time import monotonic, sleep
 from typing import Dict, List
 
+import pandas as pd
 from idna import unicode
 
 
@@ -40,6 +41,7 @@ def checking_requirements_txt():
     assert 'certifi' in requirements, 'Проверьте, что certifi есть в файле requirements.txt'
     assert 'urllib3' in requirements, 'Проверьте, что urllib3 есть в файле requirements.txt'
     assert 'soupsieve' in requirements, 'Проверьте, что soupsieve есть в файле requirements.txt'
+    assert 'pandas' in requirements, 'Проверьте, что pandas есть в файле requirements.txt'
 
 
 checking_requirements_txt()
@@ -189,12 +191,12 @@ HEADERS_TEST = {
 HEADERS_TAB = {
     'rowNom': 'п\п',  # i_row
     'ques': 'Ключ',  # url_ques
-    'company_title': 'Заголовок',  # my_company_title
     'company_cid': 'Позиция',  # my_company_cid
     'company_link_1': 'Домен',  # my_company_link_1
     'company_url': 'URL',  # my_company_url
-    'company_fast_links': 'БС',  # my_company_site_links
+    'company_title': 'Заголовок',  # my_company_title
     'company_text': 'Текст',  # my_company_text
+    'company_fast_links': 'БС',  # my_company_site_links
     'company_contact': 'Контакты'
 }
 
@@ -429,7 +431,7 @@ class WriterToXLSX:
             l_message(calling_script(), '\n Нет данных для записи в файл! \n', color=BColors.FAIL)
             return
 
-        self.insert_headers_divs_requests()
+        # self.insert_headers_divs_requests()
         excel_app, wbook = self.create_workbook
 
         if __debug__ and not PASSED:
@@ -622,7 +624,7 @@ class InfoGetter:
         return link_string
 
     def get_my_company_link_1(self):
-        """Найти и вернуть быструю ссылку на сайт компании.
+        """Найти и вернуть ссылку на сайт компании.
         """
         try:
             my_company_link_1: str = self.div.find('a', attrs={
@@ -630,7 +632,7 @@ class InfoGetter:
 
             if my_company_link_1 is None:
                 my_company_link_1: str = self.div.find('a', attrs={
-                    'class': '"link link_theme_outer path__item i-bem link_js_inited"'}).find('b').text
+                    'class': 'link link_theme_outer path__item click i-bem'}).find('b').text
 
             if my_company_link_1 is None:
                 my_company_link_1: str = 'N/A'
@@ -645,6 +647,10 @@ class InfoGetter:
             except AttributeError as err:
                 l_message(calling_script(), f" AttributeError: {repr(err)}", color=BColors.FAIL)
                 my_company_link_1: str = 'N/A'
+
+
+        if my_company_link_1== 'N/A':
+            breakpoint()
 
         return my_company_link_1
 
@@ -1068,22 +1074,26 @@ class ParserYandex(Parser):
                 return
 
             self.divs_requests.append(
-                {
-                    'rowNom': i_row,
-                    'ques': self.ques,
-                    'company_title': my_company_title,
-                    'company_cid': my_company_cid,
-                    'company_link_1': my_company_link_1,
-                    'company_fast_links': my_company_site_fast_links,
-                    'company_text': my_company_text,
-                    'company_contact': my_company_contact,
-                    'company_url': my_company_url
-                }
+                {'rowNom': i_row,
+                 'ques': self.ques,
+                 'company_cid': my_company_cid,
+                 'company_link_1': my_company_link_1,
+                 'company_url': my_company_url,
+                 'company_title': my_company_title,
+                 'company_text': my_company_text,
+                 'company_fast_links': my_company_site_fast_links,
+                 'company_contact': my_company_contact,
+                 }
             )
             i_row = i_row + 1
 
             if WRITE_TO_JSON:
                 write_json_file(data=self.divs_requests, name=PARSER_NAME + "_divs")
+
+    def _insert_headers_divs_requests(self):
+        """Создание заголовков в list с распарсенными данными.
+        """
+        return self.divs_requests.insert(0, HEADERS_TAB)
 
     def write_data_to_file(self, readjsonfile=False):
         """ Запись данных в файл .XLSX
@@ -1091,6 +1101,25 @@ class ParserYandex(Parser):
         if readjsonfile:
             self.divs_requests = read_json_file(PARSER_NAME + "_divs")
 
+        self._insert_headers_divs_requests()
+
+        self._recording_with_pandas()
+
+        self._recording_with_pypiwin32()
+
+    def _recording_with_pandas(self):
+        try:
+            df = pd.DataFrame(self.divs_requests)
+            df.to_excel(f'./DataFrame {PARSER_NAME} {self.date_today()}.xlsx',
+                        index=False,
+                        header=False)
+            l_message(calling_script(), f'данные успешно записаны из DataFrame '
+                                        f'в файл DataFrame {PARSER_NAME} {self.date_today()}.xlsx',
+                      color=BColors.OKBLUE)
+        except Exception as err:
+            l_message(calling_script(), f" Exception: {repr(err)}", color=BColors.FAIL)
+
+    def _recording_with_pypiwin32(self):
         file_writer = WriterToXLSX(self.divs_requests, self.get_full_path)
         file_writer.file_writer()
 
@@ -1109,14 +1138,37 @@ class ParserYandexWithSelenium(Parser):
         self.selenium_divs = []
         self.soup_attribute = SOUP_ATTRIBUTE
 
-    def write_data_to_file(self):
-        """ Запись данных в файл.
+    def _insert_headers_divs_requests(self):
+        """Создание заголовков в list с распарсенными данными.
         """
+        return self.divs_requests.insert(0, HEADERS_TAB)
 
-        if WRITE_TO_JSON:
-            write_json_file(data=self.divs_requests, name="divs")
+    def write_data_to_file(self, readjsonfile=False):
+        """ Запись данных в файл .XLSX
+        """
+        if readjsonfile:
+            self.divs_requests = read_json_file(PARSER_NAME + "_divs")
 
-        file_writer = WriterToXLSX(self.divs_requests, self.full_path)
+        self._insert_headers_divs_requests()
+
+        self._recording_with_pandas()
+
+        self._recording_with_pypiwin32()
+
+    def _recording_with_pandas(self):
+        try:
+            df = pd.DataFrame(self.divs_requests)
+            df.to_excel(f'./DataFrame {PARSER_NAME} {self.date_today()}.xlsx',
+                        index=False,
+                        header=False)
+            l_message(calling_script(), f'данные успешно записаны из DataFrame '
+                                        f'в файл DataFrame {PARSER_NAME} {self.date_today()}.xlsx',
+                      color=BColors.OKBLUE)
+        except Exception as err:
+            l_message(calling_script(), f" Exception: {repr(err)}", color=BColors.FAIL)
+
+    def _recording_with_pypiwin32(self):
+        file_writer = WriterToXLSX(self.divs_requests, self.get_full_path)
         file_writer.file_writer()
 
     @staticmethod
@@ -1159,13 +1211,14 @@ class ParserYandexWithSelenium(Parser):
             self.divs_requests.append(
                 {'rowNom': i_row,
                  'ques': self.ques,
-                 'company_title': my_company_title,
                  'company_cid': my_company_cid,
                  'company_link_1': my_company_link_1,
-                 'company_fast_links': my_company_site_fast_links,
+                 'company_url': my_company_url,
+                 'company_title': my_company_title,
                  'company_text': my_company_text,
+                 'company_fast_links': my_company_site_fast_links,
                  'company_contact': my_company_contact,
-                 'company_url': my_company_url}
+                 }
             )
             i_row = i_row + 1
 
@@ -1607,7 +1660,7 @@ PARSE_WITH_SELENIUM = False
 # то меняем WRITE_DATA_FROM_FILE  с False на  True
 # тогда записываются все собранные данные
 # *  не забываем вернуть обратно
-WRITE_DATA_FROM_FILE = False
+WRITE_DATA_FROM_FILE = True
 
 
 def main():
