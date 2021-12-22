@@ -2,14 +2,15 @@ beautifulsoup4==4.9.3
 certifi==2020.12.5
 chardet==4.0.0
 idna==2.10
-lxml==4.6.2
+lxml==4.7.1
 pypiwin32==223
 pywin32==300
 requests==2.25.1
 soupsieve==2.2
-tqdm==4.59.0
+tqdm==4.62.3
 urllib3==1.26.4
 pandas==1.2.4
+openpyxl==3.0.9
 
 setuptools~=50.3.0
 selenium~=3.141.0

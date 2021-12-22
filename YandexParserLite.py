@@ -1,12 +1,7 @@
 """ Парсер яндекса.
     Все файлы, зависимости, настройки и логика в одном файле.
-    Специально для братика :)
+    Специально для братика:)
 """
-
-""" Перед началом работ необходимо выполнить команду python -m pip install --upgrade pip для обновлния pip 
-"""
-
-'Перед началом работ необходимо выполнить команду pip3 install -r requirements.txt при наличии файла requirements.txt '
 
 import asyncio
 import inspect
@@ -23,7 +18,11 @@ from time import monotonic, sleep
 from typing import Dict, List
 
 import pandas as pd
-from idna import unicode
+
+""" Перед началом работ необходимо выполнить команду python -m pip install --upgrade pip для обновлния pip 
+"""
+
+'Перед началом работ необходимо выполнить команду pip3 install -r requirements.txt при наличии файла requirements.txt '
 
 
 def checking_requirements_txt():
@@ -33,18 +32,21 @@ def checking_requirements_txt():
         with open(f'{"requirements.txt"}', 'r') as file:
             requirements = file.read()
     except FileNotFoundError:
-        assert False, 'Проверьте, что добавили файл requirements.txt'
+        raise ParserError('Проверьте, что добавили файл requirements.txt')
 
     assert 'beautifulsoup4' in requirements, 'Проверьте, что beautifulsoup4 есть в файле requirements.txt'
     assert 'lxml' in requirements, 'Проверьте, что lxml есть в файле requirements.txt'
     assert 'pypiwin32' in requirements, 'Проверьте, что pypiwin32 есть в файле requirements.txt'
-    assert 'certifi' in requirements, 'Проверьте, что certifi есть в файле requirements.txt'
     assert 'urllib3' in requirements, 'Проверьте, что urllib3 есть в файле requirements.txt'
     assert 'soupsieve' in requirements, 'Проверьте, что soupsieve есть в файле requirements.txt'
     assert 'pandas' in requirements, 'Проверьте, что pandas есть в файле requirements.txt'
 
 
 checking_requirements_txt()
+
+
+class ParserError(Exception):
+    pass
 
 
 def _read_requirements(realpath: str = 'requirements.txt'):
@@ -59,11 +61,12 @@ def _read_requirements(realpath: str = 'requirements.txt'):
 
 _REQUIREMENTS_TXT = _read_requirements(realpath="requirements.txt")
 INSTALL_REQUIRES = [line for line in _REQUIREMENTS_TXT if "://" not in line]
+DONE = '\n**** Done ****\n'
 
 
 def prepare_venv():
-    """ принудительное обновление / создание / подготовка виртуального окружения и venv с помощью subprocess.call
-        установка зацисимостей из requirements.txt
+    """ Принудительное обновление / создание / подготовка виртуального окружения и venv с помощью subprocess.call
+        установка зависимостей из requirements.txt
     """
     app_venv_name = "venv"
 
@@ -127,17 +130,12 @@ try:
 except ImportError:
     raise ImportError('для установки этой библиотеки введите команду pip install proxybroker в терминале')
 
-try:
-    to_unicode = unicode
-except NameError:
-    to_unicode = str
-
 # ---------------------------------- Setting ----------------------------------
 
 
 PASSED = False  # включение отладки
 
-__date__ = '16.05.2021'
+__date__ = '08.09.2021'
 __author__ = 'kokkaina13@gmail.com (Alex Korshakov)'
 PARSER_NAME: str = 'ParserYandexSimplified'
 print(f'Invoking __init__.py for {__name__}')
@@ -151,7 +149,7 @@ MAX_PROXYES: int = 25
 # время ожидания между отправкой повторного запроса
 REQUEST_TIMEOUT = 10.24
 
-# базовый url  для отправки запросов
+# базовый url для отправки запросов
 HOST: str = 'https://yandex.ru'
 
 # агент представления запроса
@@ -189,7 +187,7 @@ HEADERS_TEST = {
 
 # заголовки таблицы выгрузки
 HEADERS_TAB = {
-    'rowNom': 'п\п',  # i_row
+    'rowNom': r'п\п',  # i_row
     'ques': 'Ключ',  # url_ques
     'company_cid': 'Позиция',  # my_company_cid
     'company_link_1': 'Домен',  # my_company_link_1
@@ -266,8 +264,8 @@ SOUP_ATTRIBUTE: str = 'text'
 # ---------------------------------- LOG Setting ----------------------------------
 
 
-VIS_LOG = False  # True -  Отображение хода процесса в консоли
-PRINT_LOG = True  # True -  Запись лога в файл
+VIS_LOG = False  # True - Отображение хода процесса в консоли
+PRINT_LOG = True  # True - Запись лога в файл
 
 CONFIG = {'get_main_interval': 6,
           'get_reConnect_interval': 5,  # Time (seconds). Recommended value: 5
@@ -295,13 +293,13 @@ def write_json_file(*, data: object = None, name: str = "") -> None:
                               sort_keys=True,
                               separators=(',', ': '),
                               ensure_ascii=False)
-            outfile.write(to_unicode(str_))
+            outfile.write(str_)
     except TypeError as err:
         l_message(calling_script(), f" TypeError: {repr(err)}", color=BColors.FAIL)
 
 
 def read_json_file(file) -> list:
-    """Чтение данных из json
+    """Чтение данных json
     """
     try:
         with open(file + ".json", 'r', encoding='utf8') as data_file:
@@ -325,8 +323,7 @@ class BColors:  # colors in console
 
 
 def decorate_msg(msg, color=None) -> str:
-    """ Returns: colored msg, if colors are enabled in config and a color is provided for msg
-        msg, otherwise
+    """ Returns: colored msg, if colors are enabled in config and a color is provided for msg, otherwise
     """
     msg_string = msg
     if CONFIG['colors']:
@@ -340,16 +337,16 @@ def write_to_console(*, param_name: str = None, p_value=None):
     try:
         if param_name == 'NLine':
             print('=' * 100)
-        NOW = str(datetime.now().strftime("%d.%m.%Y %H.%M.%S")) + " :: "
+        now: str = str(datetime.now().strftime("%d.%m.%Y %H.%M.%S")) + " :: "
         try:
             if len(p_value) < 100:
-                print(NOW + f'Параметр {param_name} Значение: {p_value}')
+                print(now + f'Параметр {param_name} Значение: {p_value}')
             else:
-                print(NOW + f'Параметр {param_name} Значение: {p_value[:100] + "..."}')
+                print(now + f'Параметр {param_name} Значение: {p_value[:100] + "..."}')
 
         except Exception as err:
             print('Не итерируемый параметр', str(err.args), True)
-            print(NOW + f'Параметр {param_name} Значение: {p_value}')
+            print(now + f'Параметр {param_name} Значение: {p_value}')
 
     except ConnectionError as err:
         log_vis_rec(param_name='log_vis_rec: Ошибка вывода в консоль', p_value=str(err.args), r_log=True)
@@ -358,10 +355,10 @@ def write_to_console(*, param_name: str = None, p_value=None):
 def write_to_text_log(*, param_name: str = None, p_value=None, d_path=None):
     """ Запись в логфайл.
     """
-    NOW = str(datetime.now().strftime("%d.%m.%Y %H.%M.%S")) + " :: "
+    now = str(datetime.now().strftime("%d.%m.%Y %H.%M.%S")) + " :: "
     try:
         with open(DATE_TODAY + ' ' + d_path + r'_Log.txt', 'a', encoding='utf-8') as file:
-            text = NOW + f'Параметр *** {param_name} *** Значение : {p_value}'
+            text = now + f'Параметр *** {param_name} *** Значение : {p_value}'
             file.write(text + '\n')
 
     except ConnectionError as err:
@@ -369,7 +366,7 @@ def write_to_text_log(*, param_name: str = None, p_value=None, d_path=None):
 
 
 def log_vis_rec(*, param_name: str = None, p_value=None, d_path=None, r_log: bool = None, r_print: bool = None):
-    """ Функция логирования в файл и отображения данны в консоли.
+    """ Функция логирования в файл и отображения данных в консоли.
     """
     if r_log:
         write_to_console(param_name=param_name, p_value=p_value)
@@ -379,7 +376,7 @@ def log_vis_rec(*, param_name: str = None, p_value=None, d_path=None, r_log: boo
 
 
 def l_message(names=None, value=None, color=None, r_log=None, r_print=None) -> None:
-    """ Функция логирования в файл и отображения данны в терминале.
+    """ Функция логирования в файл и отображения данных в терминале.
     :rtype: None
     """
     if isinstance(r_log, type(None)):
@@ -388,7 +385,11 @@ def l_message(names=None, value=None, color=None, r_log=None, r_print=None) -> N
         r_print = PRINT_LOG
 
     name = names[0]
-    dir_function = names[1]
+
+    if names[1].find('\\'):
+        dir_function = names[1].split('\\')[-1]
+    else:
+        dir_function = names[1]
 
     log_vis_rec(param_name=name, p_value=value, d_path=dir_function, r_log=r_log, r_print=r_print)
 
@@ -403,7 +404,7 @@ def l_message(names=None, value=None, color=None, r_log=None, r_print=None) -> N
         print(decorate_msg("lm " + name + f" TypeError: {repr(err)}", BColors.FAIL))
 
 
-def calling_script() -> object:
+def calling_script() -> list:
     """ Получение имени вызывающей функции.
     :rtype: object
     """
@@ -573,13 +574,13 @@ class InfoGetter:
         """Найти и вернуть контакты компании.
         """
         try:
-            my_company_contact: str = self.div.find('span', attrs={
+            my_company_contact_dict = self.div.find('span', attrs={
                 'class': 'VanillaReact CoveredPhone'})
+            my_company_contact: str = 'N/A'
 
-            if my_company_contact is not None:
-                my_company_contact = "".join(c for c in my_company_contact['data-vnl'] if c.isdecimal())
-
-            if my_company_contact is None:
+            if my_company_contact_dict is not None:
+                my_company_contact = "".join(c for c in my_company_contact_dict.get('data-vnl') if c.isdecimal())
+            if not my_company_contact_dict:
                 my_company_contact: str = 'N/A'
 
             l_message(calling_script(), f'company_contact {my_company_contact}', color=BColors.OKBLUE)
@@ -608,7 +609,7 @@ class InfoGetter:
         """Найти и вернуть ссылку на сайт компании.
         """
         try:
-            company_fast_links: str = self.div.find_all('div', attrs={
+            company_fast_links: dict = self.div.find_all('div', attrs={
                 'class': 'Sitelinks-Item sitelinks__item'})
 
             link_string = ''
@@ -634,14 +635,17 @@ class InfoGetter:
     def get_my_company_link_1(self) -> str:
         """Найти и вернуть ссылку на сайт компании.
         """
-        my_company_link_1 = None
+
         attrs_classes = [
             'link link_theme_outer path__item click i-bem',
             'Link Link_theme_outer Path-Item link path__item',
             'link link_theme_outer path__item i-bem link_js_inited',
             'link link_theme_outer path__item i-bem',
+            'Link Link_theme_outer Path-Item link path__item organic__greenurl',
+            'Link Link_theme_outer Path-Item link path__item link organic__greenurl',
+            'Link Link_theme_outer Path-Item click link i-bem path__item click link i-bem organic__greenurl'
         ]
-
+        my_company_link_1: str = 'N/A'
         for item_class in attrs_classes:
             try:
                 my_company_link_1 = self.div.find('a', attrs={'class': item_class})
@@ -653,7 +657,6 @@ class InfoGetter:
                 l_message(calling_script(), f'company_link_1 {my_company_link_1}', color=BColors.FAIL)
                 continue
 
-        my_company_link_1: str = 'N/A'
         return my_company_link_1
 
     def get_my_company_url(self) -> str:
@@ -682,12 +685,12 @@ class Parser:
     """ Базовый класс парсера с основными функциями
     """
 
-    def __init__(self, path_to_queries: str = None, query=None):
+    def __init__(self, path_to_queries: str = None, query: object = None):
 
         self.urls = None
         self.queries_path = path_to_queries
         self.query = query
-        self.divs_requests: list = []  # список c ответами
+        self.divs_requests: list = []  # список с ответами
         self.result: list = []
 
         self.headers: list = []
@@ -697,7 +700,7 @@ class Parser:
         self.request = None
         self.session = None
 
-        self.proxyes: list = []  # создаем список c прокси
+        self.proxyes: list = []  # создаем список с прокси
         self.full_path_to_file = None
         self.get_proxy_path = None
         self.request_timeout = None
@@ -708,12 +711,12 @@ class Parser:
 
         self.proxy_maker = ProxyMaker()
 
-    def start_pars(self, urls: object) -> object:
+    def start_pars(self, urls: list) -> None:
         """ Определение начало работы в базовом классе.
         """
         assert self.urls is not None, f"{calling_script()} urls not passed"
 
-        self.urls = urls
+        self.urls: list = urls
 
         for number, item_url in enumerate(self.urls):
             l_message(calling_script(), f"\nЗапрос номер: {number + 1} \n", color=BColors.OKBLUE)
@@ -795,8 +798,6 @@ class Parser:
             self.proxy_maker.run()
             self.proxyes = self.get_proxy_pool_from_file()
 
-        assert self.proxyes is not None, "proxyes not set"
-
         data_requests = self._create_data_request()
 
         for request_number, item_request in enumerate(list(data_requests)):
@@ -816,12 +817,11 @@ class Parser:
                                                          proxies=item_data['proxy'])
                     self._measure_time_request(str(calling_script()), time_start)
 
-                    if self.check_request_status_code(self.request):
-                        return self.request
-                    else:
+                    if not self.check_request_status_code(self.request):
                         l_message(calling_script(), 'Ошибка при установке соединения! проверьте HEADERS!',
                                   color=BColors.FAIL)
                         continue
+                    return self.request
 
                 except ConnectTimeout as err:
                     l_message(calling_script(), f"ConnectTimeout: {repr(err)}", color=BColors.FAIL)
@@ -991,7 +991,7 @@ class ParserYandex(Parser):
     SOUP_ATTRIBUTE: str
 
     def __init__(self, ):
-        super(ParserYandex, self).__init__(self)
+        super(ParserYandex, self).__init__()
 
         self.headers = [HEADERS_TEST, KAD_HEAD]
         self.full_path_to_file = FULL_PATH
@@ -1004,12 +1004,12 @@ class ParserYandex(Parser):
         self.get_soup_class = SOUP_CLASS
         self.get_soup_attribute = SOUP_ATTRIBUTE
 
-    def start_pars(self, urls):
-        """ функция парсера.
+    def start_pars(self, urls: list):
+        """ Функция парсера.
         """
         assert urls is not None, str(calling_script()) + 'urls not passed'
 
-        self.urls = urls
+        self.urls: list = urls
 
         for response_number, item_url in enumerate(self.urls):
             l_message(calling_script(), f"\nЗапрос номер: {response_number + 1} \n", color=BColors.OKBLUE)
@@ -1139,7 +1139,7 @@ class ParserYandexWithSelenium(Parser):
     """
 
     def __init__(self, ):
-        super(ParserYandexWithSelenium, self).__init__(self)
+        super(ParserYandexWithSelenium, self).__init__()
 
         self.divs = None
         self.content = None
@@ -1241,7 +1241,7 @@ class ParserYandexWithSelenium(Parser):
             self.content = file.read()
         return self.content
 
-    def get_selenium_divs(self) -> object:
+    def get_selenium_divs(self) -> None:
         """Поиск файлов в папке fold_path
         """
         for filename in listdir(CURRENT_DIR + self.fold_path):
@@ -1262,7 +1262,7 @@ class ParserYandexWithSelenium(Parser):
         l_message(calling_script(), f'Всего найдено блоков {str(len(self.divs))}', color=BColors.OKBLUE)
 
     def start_pars(self, **kvargs):
-        """ функция парсера.
+        """ Функция парсера.
         """
         self.get_selenium_divs()
 
@@ -1378,7 +1378,7 @@ class Webdriver:
 
 # ---------------------------------- constructor url ----------------------------------
 
-def url_constructor_yandex():
+def url_constructor_yandex() -> list:
     """ Формирование запросов из запчастей.
     """
     queries_path = QUERIES_PATH
@@ -1649,7 +1649,7 @@ class ProxyMaker:
             self._load_proxies_list()
             # self._time_rand(10, 15)
 
-        l_message(calling_script(), '\n**** Done ****\n', color=BColors.OKBLUE)
+        l_message(calling_script(), DONE, color=BColors.OKBLUE)
 
     @staticmethod
     def _time_rand(t_start, t_stop):
@@ -1666,10 +1666,10 @@ class ProxyMaker:
 #  парсинг с использованием SELENIUM
 PARSE_WITH_SELENIUM = False
 
-# Если надо остановить процесс а потом записать всё что насобиралось
-# то меняем WRITE_DATA_FROM_FILE  с False на  True
+# Если надо остановить процесс, а потом записать всё что насобиралось -
+# то меняем WRITE_DATA_FROM_FILE с False на True
 # тогда записываются все собранные данные
-# *  не забываем вернуть обратно
+# * не забываем вернуть обратно
 WRITE_DATA_FROM_FILE = False
 
 
@@ -1682,7 +1682,7 @@ def main():
         l_message(calling_script(), 'Выбрана запись из файла .json', color=BColors.OKBLUE)
         parser = ParserYandex()
         parser.write_data_to_file(readjsonfile=True)
-        l_message(calling_script(), '\n**** Done ****\n', color=BColors.OKBLUE)
+        l_message(calling_script(), DONE, color=BColors.OKBLUE)
         return
 
     urls = url_constructor_yandex()
@@ -1696,7 +1696,7 @@ def main():
     parser = ParserYandex()
     parser.start_pars(urls=urls)
 
-    l_message(calling_script(), '\n**** Done ****\n', color=BColors.OKBLUE)
+    l_message(calling_script(), DONE, color=BColors.OKBLUE)
 
 
 if __name__ == '__main__':
