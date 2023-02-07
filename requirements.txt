@@ -15,3 +15,4 @@ openpyxl==3.0.9
 setuptools~=50.3.0
 selenium~=3.141.0
 proxybroker~=0.3.2
+numpy>=1.22.2 # not directly required, pinned by Snyk to avoid a vulnerability
