@@ -5,7 +5,7 @@ idna==2.10
 lxml==4.7.1
 pypiwin32==223
 pywin32==300
-requests==2.25.1
+requests==2.31.0
 soupsieve==2.2
 tqdm==4.62.3
 urllib3==1.26.4
