@@ -7,7 +7,7 @@ pypiwin32==223
 pywin32==300
 requests==2.25.1
 soupsieve==2.2
-tqdm==4.62.3
+tqdm==4.66.3
 urllib3==1.26.4
 pandas==1.2.4
 openpyxl==3.0.9
